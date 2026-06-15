@@ -97,10 +97,14 @@ const Chapter1Scene = {
         this.npcs.push(this.thuNPC);
 
         // Hotspots
+        // NOTE: hotspots must sit on WALKABLE tiles (not on the solid banyan/stone
+        // tiles themselves) so the player can stand inside them to press Space.
         this.hotspots = [
-            new Hotspot(3 * 16, 5 * 16, 32, 16, 'tree', 'Cây đa'),
+            // dirt path just below the banyan (rows 6-9, cols 4-5)
+            new Hotspot(4 * 16, 6 * 16, 32, 48, 'tree', 'Cây đa'),
             new Hotspot(14 * 16, 14 * 16, 32, 16, 'pond', 'Bờ ao'),
-            new Hotspot(24 * 16, 3 * 16, 48, 32, 'temple', 'Sân đình'),
+            // grass strip just below the đình stone wall (row 5, cols 23-27)
+            new Hotspot(23 * 16, 5 * 16, 80, 16, 'temple', 'Sân đình'),
         ];
     },
 
