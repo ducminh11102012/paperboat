@@ -90,7 +90,11 @@ const Engine = {
         this.lastTime = now;
         this.frameCount++;
 
-        if (this.currentScene && this.currentScene.update) {
+        // Village map overlay intercepts input + freezes the world while open
+        if (typeof MapScreen !== 'undefined') MapScreen.handleInput();
+        const mapOpen = (typeof MapScreen !== 'undefined') && MapScreen.active;
+
+        if (!mapOpen && this.currentScene && this.currentScene.update) {
             this.currentScene.update(this.dt);
         }
 
@@ -105,9 +109,13 @@ const Engine = {
         }
 
         // Guidance HUD (drawn above world, below dialogue handled per-scene)
-        if (typeof Hud !== 'undefined' && this.currentScene && this.currentScene.showHud !== false) {
+        if (typeof Hud !== 'undefined' && this.currentScene && this.currentScene.showHud !== false && !mapOpen) {
             Hud.render(ctx);
+            if (typeof MapScreen !== 'undefined') MapScreen.renderButtonHint(ctx);
         }
+
+        // Village map overlay (above everything except transitions)
+        if (typeof MapScreen !== 'undefined') MapScreen.render(ctx);
 
         // Transition overlay
         if (this.transitioning) {

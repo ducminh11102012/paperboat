@@ -176,15 +176,17 @@ const Hud = {
             const lines = vi ? [
                 ['▲▼◀▶ / WASD', 'Di chuyển'],
                 ['SPACE / Z', 'Nói chuyện · Tương tác'],
+                ['M', 'Mở bản đồ làng'],
                 ['Mũi tên vàng', 'Chỉ tới mục tiêu tiếp theo'],
                 ['Dấu !', 'Có thể tương tác ở đây'],
             ] : [
                 ['▲▼◀▶ / WASD', 'Move'],
                 ['SPACE / Z', 'Talk · Interact'],
+                ['M', 'Open village map'],
                 ['Yellow arrow', 'Points to your next goal'],
                 ['The ! mark', 'Something to interact with'],
             ];
-            const bw = 210, bh = 116, bx = (W - bw) / 2, by = (H - bh) / 2;
+            const bw = 210, bh = 132, bx = (W - bw) / 2, by = (H - bh) / 2;
             ctx.fillStyle = 'rgba(24,20,32,0.95)';
             Engine.roundRect(ctx, bx, by, bw, bh, 8); ctx.fill();
             ctx.strokeStyle = 'rgba(255,215,120,0.5)'; ctx.lineWidth = 0.8;
