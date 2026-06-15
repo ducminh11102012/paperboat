@@ -242,7 +242,21 @@ const Sprites = {
             eyes: '#1a1a2e',
         });
 
+        // Ông lái đò (ghost — spirit case)
+        this.createCharacter('lai_do', {
+            skin: '#aebccb',
+            hair: '#6a7480',
+            shirt: '#54707f',
+            pants: '#3e5560',
+            shoes: '#2e3a42',
+            eyes: '#16202a',
+        }, true);
+
         // Portraits
+        this.createPortrait('lai_do', {
+            skin: '#aebccb', hair: '#6a7480', shirt: '#54707f',
+            bg: '#1c2a36', isGhost: true
+        });
         this.createPortrait('minh', {
             skin: '#e8c8a0', hair: '#2a2020', shirt: '#a0c8e8',
             bg: '#2a3040'
