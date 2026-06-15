@@ -25,7 +25,9 @@ const Chapter3Scene = {
         this.cinematicDim = 0;
         this.createMap();
         this.createNPCs();
-        Player.reset(10 * 16, 12 * 16);
+        // Spawn on the main dirt road just north of grandma's house (was inside the
+        // solid HOUSE tile at row12/col10 → player got stuck on all sides).
+        Player.reset(8 * 16 + 8, 10 * 16 + 8);
         Audio.playMusic('doubt');
     },
 
