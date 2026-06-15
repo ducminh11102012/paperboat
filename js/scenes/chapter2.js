@@ -278,88 +278,57 @@ const Chapter2Scene = {
         Dialogue.render(ctx);
     },
 
-    renderSceneBG(ctx) {
-        // Different backgrounds for different scenes
-        if (this.phase === 'scene_ghost') {
-            // Dark night for ghost festival
-            const grad = ctx.createLinearGradient(0, 0, 0, Engine.H);
-            grad.addColorStop(0, '#08080f');
-            grad.addColorStop(1, '#0a0a18');
-            ctx.fillStyle = grad;
-            ctx.fillRect(0, 0, Engine.W, Engine.H);
+    drawPaintedBG(ctx, key, overlay) {
+        const art = (typeof Assets !== 'undefined') ? Assets.get(key) : null;
+        if (art) {
+            ctx.imageSmoothingEnabled = true;
+            ctx.drawImage(art, 0, 0, Engine.W, Engine.H);
+            ctx.imageSmoothingEnabled = false;
+            if (overlay) { ctx.fillStyle = overlay; ctx.fillRect(0, 0, Engine.W, Engine.H); }
+            return true;
+        }
+        return false;
+    },
 
-            // Dim incense glow
-            ctx.fillStyle = 'rgba(200, 100, 30, 0.05)';
-            ctx.fillRect(Engine.W / 2 - 20, Engine.H / 2 - 10, 40, 20);
+    renderSceneBG(ctx) {
+        if (this.phase === 'scene_ghost') {
+            if (this.drawPaintedBG(ctx, 'bg_festival', 'rgba(10,8,24,0.45)')) return;
+            const g0 = ctx.createLinearGradient(0, 0, 0, Engine.H);
+            g0.addColorStop(0, '#08080f'); g0.addColorStop(1, '#0a0a18');
+            ctx.fillStyle = g0; ctx.fillRect(0, 0, Engine.W, Engine.H);
             return;
         }
 
-        // Default: warm village scene
+        const cold = this.phase.includes('silence');
+        if (this.drawPaintedBG(ctx, 'bg_sky_dusk', cold ? 'rgba(40,50,90,0.35)' : null)) return;
+
+        // Fallback gradient (if art not loaded)
         const grad = ctx.createLinearGradient(0, 0, 0, Engine.H);
-        if (this.phase.includes('silence')) {
-            grad.addColorStop(0, '#2a2840');
-            grad.addColorStop(1, '#1a2030');
-        } else {
-            grad.addColorStop(0, '#4a6a8a');
-            grad.addColorStop(1, '#3a5a3a');
-        }
+        if (cold) { grad.addColorStop(0, '#2a2840'); grad.addColorStop(1, '#1a2030'); }
+        else { grad.addColorStop(0, '#4a6a8a'); grad.addColorStop(1, '#3a5a3a'); }
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, Engine.W, Engine.H);
-
-        // Ground
         ctx.fillStyle = '#3a5a2a';
         ctx.fillRect(0, Engine.H * 0.6, Engine.W, Engine.H * 0.4);
-
-        // Pond/river
-        ctx.fillStyle = '#3a6a8a';
-        const waterY = Engine.H * 0.7;
-        ctx.fillRect(20, waterY, Engine.W - 40, 30);
-        // Ripples
-        for (let x = 25; x < Engine.W - 40; x += 12) {
-            const ry = Math.sin((Engine.frameCount + x) * 0.06);
-            ctx.fillStyle = 'rgba(80, 130, 170, 0.4)';
-            ctx.fillRect(x, waterY + 8 + ry, 8, 1);
-        }
-
-        // Trees in background
-        ctx.fillStyle = '#2a4a2a';
-        ctx.fillRect(10, Engine.H * 0.45, 20, 30);
-        ctx.fillRect(60, Engine.H * 0.42, 25, 35);
-        ctx.fillRect(240, Engine.H * 0.44, 22, 32);
-        ctx.fillRect(280, Engine.H * 0.46, 18, 28);
-
-        // Canopy
-        ctx.fillStyle = '#3a6a2a';
-        ctx.fillRect(5, Engine.H * 0.38, 30, 12);
-        ctx.fillRect(55, Engine.H * 0.35, 35, 12);
     },
 
     renderFireflyGame(ctx) {
-        // Dark night background
-        const grad = ctx.createLinearGradient(0, 0, 0, Engine.H);
-        grad.addColorStop(0, '#050510');
-        grad.addColorStop(0.5, '#0a0a1a');
-        grad.addColorStop(1, '#0a1a0a');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, Engine.W, Engine.H);
-
-        // Stars
-        for (let i = 0; i < 20; i++) {
-            const sx = (i * 37 + 13) % Engine.W;
-            const sy = (i * 23 + 7) % (Engine.H * 0.4);
-            const br = 0.3 + 0.7 * Math.abs(Math.sin(Engine.frameCount * 0.02 + i));
-            ctx.fillStyle = `rgba(255, 255, 220, ${br})`;
-            ctx.fillRect(sx, sy, 1, 1);
+        const painted = this.drawPaintedBG(ctx, 'bg_night_river', 'rgba(4,6,18,0.25)');
+        if (!painted) {
+            const grad = ctx.createLinearGradient(0, 0, 0, Engine.H);
+            grad.addColorStop(0, '#050510'); grad.addColorStop(0.5, '#0a0a1a'); grad.addColorStop(1, '#0a1a0a');
+            ctx.fillStyle = grad; ctx.fillRect(0, 0, Engine.W, Engine.H);
+            // Stars (fallback only)
+            for (let i = 0; i < 20; i++) {
+                const sx = (i * 37 + 13) % Engine.W;
+                const sy = (i * 23 + 7) % (Engine.H * 0.4);
+                const br = 0.3 + 0.7 * Math.abs(Math.sin(Engine.frameCount * 0.02 + i));
+                ctx.fillStyle = `rgba(255, 255, 220, ${br})`;
+                ctx.fillRect(sx, sy, 1, 1);
+            }
+            ctx.fillStyle = '#0a1a0a';
+            ctx.fillRect(0, Engine.H * 0.75, Engine.W, Engine.H * 0.25);
         }
-
-        // Ground silhouette
-        ctx.fillStyle = '#0a1a0a';
-        ctx.fillRect(0, Engine.H * 0.75, Engine.W, Engine.H * 0.25);
-
-        // Tree silhouettes
-        ctx.fillStyle = '#0a150a';
-        ctx.fillRect(20, Engine.H * 0.5, 15, Engine.H * 0.3);
-        ctx.fillRect(280, Engine.H * 0.48, 18, Engine.H * 0.3);
 
         // Fireflies
         for (const f of this.fireflies) {

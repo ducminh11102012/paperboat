@@ -61,9 +61,8 @@ const Chapter1Scene = {
                 // Shrine next to banyan
                 if (r === 6 && c === 3) tile = T.SHRINE;
 
-                // Temple/Đình (top right area)
+                // Temple/Đình gate (top right area) — walled stone structure
                 if (r >= 2 && r <= 4 && c >= 23 && c <= 27) tile = T.STONE;
-                if (r >= 2 && r <= 3 && c >= 24 && c <= 26) tile = T.HOUSE;
 
                 // Bamboo border
                 if (r === 0 || r === 19) tile = T.BAMBOO;
@@ -132,6 +131,7 @@ const Chapter1Scene = {
                     Dialogue.startRaw(Engine.getDialogue('ch1_arrive'), () => {
                         this.phase = 'explore';
                         this.baNoi.visible = false; // Bà goes inside
+                        this.enterExplore();
                     });
                 }
                 Dialogue.update(dt);
@@ -176,15 +176,39 @@ const Chapter1Scene = {
         this.cameraY = Math.max(0, Math.min(this.cameraY, 20 * 16 - Engine.H));
     },
 
+    enterExplore() {
+        Hud.showAreaToast('Làng Bến Cũ', 'Old Wharf Village');
+        Hud.showTutorial();
+        this.updateObjective();
+    },
+
+    updateObjective() {
+        const TS = 16;
+        if (!this.visitedHotspots.tree) {
+            Engine.setObjective('Tới thăm cây đa đầu làng', 'Visit the old banyan tree',
+                { x: 4 * TS + 8, y: 5 * TS + 8 });
+        } else if (!this.metThu) {
+            Engine.setObjective('Ra bờ ao chơi', 'Wander down to the pond',
+                { x: 16 * TS, y: 15 * TS });
+        } else {
+            Engine.clearObjective();
+        }
+    },
+
     updateExplore(dt) {
         Player.update(dt, (x, y) => TileMap.checkCollision(this.map, x, y));
         Dialogue.update(dt);
+        this.updateObjective();
         if (Dialogue.active) return;
 
         // Check hotspot interactions
         for (const hs of this.hotspots) {
             if (!hs.active) continue;
             if (hs.containsPoint(Player.x, Player.y)) {
+                if (!this.visitedHotspots[hs.id]) {
+                    const c = hs.center();
+                    Hud.setPrompt('Quan sát · ' + hs.label, 'Look · ' + hs.label, { x: c.x, y: c.y });
+                }
                 if (Engine.justPressed('Space') || Engine.justPressed('KeyZ')) {
                     this.interactHotspot(hs);
                 }
@@ -195,6 +219,7 @@ const Chapter1Scene = {
         for (const npc of this.npcs) {
             if (!npc.visible) continue;
             if (npc.distTo(Player.x, Player.y) < 24) {
+                Hud.setPrompt('Nói chuyện · ' + npc.name, 'Talk · ' + npc.name, { x: npc.x, y: npc.y - 8 });
                 if (Engine.justPressed('Space') || Engine.justPressed('KeyZ')) {
                     this.interactNPC(npc);
                 }
@@ -287,10 +312,14 @@ const Chapter1Scene = {
     render(ctx) {
         if (this.phase === 'title_card') {
             // Chapter title card
-            ctx.fillStyle = '#0a0a0f';
-            ctx.fillRect(0, 0, Engine.W, Engine.H);
+            const g = ctx.createLinearGradient(0, 0, 0, Engine.H);
+            g.addColorStop(0, '#10101a'); g.addColorStop(1, '#06060a');
+            ctx.fillStyle = g; ctx.fillRect(0, 0, Engine.W, Engine.H);
             ctx.globalAlpha = this.titleAlpha;
-            Engine.drawTextCentered(ctx, Engine.t('chapter_1_title'), Engine.H / 2, '#e8d8c0', 10);
+            ctx.fillStyle = 'rgba(255,215,120,0.7)';
+            ctx.fillRect(Engine.W / 2 - 26, Engine.H / 2 - 22, 52, 1);
+            Engine.drawTextCentered(ctx, Engine.locale === 'vi' ? 'CHƯƠNG MỘT' : 'CHAPTER ONE', Engine.H / 2 - 8, '#caa86a', 9, 700);
+            Engine.drawTextCentered(ctx, Engine.t('chapter_1_title'), Engine.H / 2 + 10, '#f0e6d2', 15, 700);
             ctx.globalAlpha = 1;
             return;
         }
@@ -309,27 +338,8 @@ const Chapter1Scene = {
         Player.render(ctx, this.cameraX, this.cameraY);
         frontNPCs.forEach(n => n.render(ctx, this.cameraX, this.cameraY));
 
-        // Warm overlay for Ch.1
-        ctx.fillStyle = 'rgba(200, 150, 50, 0.05)';
-        ctx.fillRect(0, 0, Engine.W, Engine.H);
-
-        // Interaction hints
-        if (this.phase === 'explore' && !Dialogue.active) {
-            for (const hs of this.hotspots) {
-                if (hs.active && !this.visitedHotspots[hs.id] && hs.containsPoint(Player.x, Player.y)) {
-                    Engine.drawTextCentered(ctx, Engine.t('interact_hint'), 12, '#ffd700', 7);
-                }
-            }
-            for (const npc of this.npcs) {
-                if (npc.visible && npc.distTo(Player.x, Player.y) < 24) {
-                    Engine.drawTextCentered(ctx, Engine.t('interact_hint'), 12, '#ffd700', 7);
-                }
-            }
-            // Move hint at start
-            if (this.timer < 5) {
-                Engine.drawTextCentered(ctx, Engine.t('move_hint'), Engine.H - 54, '#808090', 6);
-            }
-        }
+        // Ambient lighting / mood (Zelda-like)
+        TileMap.drawAmbient(ctx, 1);
 
         // Dialogue
         Dialogue.render(ctx);

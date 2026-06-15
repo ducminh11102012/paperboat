@@ -78,13 +78,14 @@ const Player = {
     },
 
     render(ctx, cameraX, cameraY) {
+        const sx = Math.floor(this.x - cameraX), sy = Math.floor(this.y - cameraY);
+        // soft shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.beginPath(); ctx.ellipse(sx, sy - 1, 6, 2.4, 0, 0, 7); ctx.fill();
         const animName = this.walking ? `walk_${this.dir}` : `idle_${this.dir}`;
         const frame = Sprites.getFrame('minh', animName, this.animFrame);
         if (frame) {
-            ctx.drawImage(frame,
-                Math.floor(this.x - cameraX - 8),
-                Math.floor(this.y - cameraY - 20)
-            );
+            ctx.drawImage(frame, sx - 8, sy - 20);
         }
     },
 };

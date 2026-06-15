@@ -1,4 +1,4 @@
-// Paper Boats — Dialogue System
+// Paper Boats — Dialogue System (crisp hi-res rendering)
 const Dialogue = {
     active: false,
     queue: [],
@@ -7,7 +7,7 @@ const Dialogue = {
     fullText: '',
     charIndex: 0,
     charTimer: 0,
-    charSpeed: 0.03, // seconds per character
+    charSpeed: 0.022,
     speaker: '',
     portrait: '',
     onComplete: null,
@@ -16,87 +16,65 @@ const Dialogue = {
     blipTimer: 0,
     waitingForInput: false,
 
-    // Start a dialogue sequence
+    // layout
+    boxH: 50,
+    get boxY() { return Engine.H - this.boxH - 6; },
+
     start(dialogueKey, onComplete) {
         const data = Engine.getDialogue(dialogueKey);
-        if (!data || data.length === 0) {
-            if (onComplete) onComplete();
-            return;
-        }
-        this.queue = data;
-        this.currentIndex = 0;
-        this.active = true;
-        this.choiceData = null;
-        this.onComplete = onComplete;
+        if (!data || data.length === 0) { if (onComplete) onComplete(); return; }
+        this.queue = data; this.currentIndex = 0; this.active = true;
+        this.choiceData = null; this.onComplete = onComplete;
         this.showLine(this.queue[0]);
     },
 
-    // Start from raw dialogue array
     startRaw(lines, onComplete) {
-        if (!lines || lines.length === 0) {
-            if (onComplete) onComplete();
-            return;
-        }
-        this.queue = lines;
-        this.currentIndex = 0;
-        this.active = true;
-        this.choiceData = null;
-        this.onComplete = onComplete;
+        if (!lines || lines.length === 0) { if (onComplete) onComplete(); return; }
+        this.queue = lines; this.currentIndex = 0; this.active = true;
+        this.choiceData = null; this.onComplete = onComplete;
         this.showLine(this.queue[0]);
     },
 
-    // Show a choice
     showChoice(choiceKey, onSelect) {
         const data = Engine.getDialogue(choiceKey);
-        if (!data || !data.options) {
-            if (onSelect) onSelect(null);
-            return;
-        }
-        this.active = true;
-        this.choiceData = data;
-        this.selectedChoice = 0;
-        this.waitingForInput = true;
-        this.displayedText = '';
-        this.fullText = '';
-        this.speaker = '';
-        this.portrait = '';
-        this.onComplete = (choice) => {
-            this.choiceData = null;
-            if (onSelect) onSelect(choice);
-        };
+        if (!data || !data.options) { if (onSelect) onSelect(null); return; }
+        this.active = true; this.choiceData = data; this.selectedChoice = 0;
+        this.waitingForInput = true; this.displayedText = ''; this.fullText = '';
+        this.speaker = ''; this.portrait = '';
+        this.onComplete = (choice) => { this.choiceData = null; if (onSelect) onSelect(choice); };
     },
 
     showLine(line) {
         this.speaker = line.speaker || '';
         this.portrait = line.portrait || '';
         this.fullText = line.text || '';
-        this.displayedText = '';
-        this.charIndex = 0;
-        this.charTimer = 0;
-        this.blipTimer = 0;
-        this.waitingForInput = false;
+        this.displayedText = ''; this.charIndex = 0; this.charTimer = 0;
+        this.blipTimer = 0; this.waitingForInput = false;
+    },
+
+    choiceLayout() {
+        const n = this.choiceData.options.length;
+        const rowH = 16;
+        const boxH = 14 + n * rowH;
+        const boxY = Engine.H - boxH - 6;
+        return { n, rowH, boxH, boxY, bx: 8, bw: Engine.W - 16 };
     },
 
     update(dt) {
         if (!this.active) return;
 
-        // Handle choice
         if (this.choiceData) {
-            if (Engine.justPressed('ArrowUp') || Engine.justPressed('KeyW')) {
+            if (Engine.justPressed('ArrowUp') || Engine.justPressed('KeyW'))
                 this.selectedChoice = Math.max(0, this.selectedChoice - 1);
-            }
-            if (Engine.justPressed('ArrowDown') || Engine.justPressed('KeyS')) {
+            if (Engine.justPressed('ArrowDown') || Engine.justPressed('KeyS'))
                 this.selectedChoice = Math.min(this.choiceData.options.length - 1, this.selectedChoice + 1);
-            }
-            // Mouse selection
-            const boxY = Engine.H - 50;
+            const L = this.choiceLayout();
             if (Engine.mouseClicked) {
-                for (let i = 0; i < this.choiceData.options.length; i++) {
-                    const cy = boxY + 8 + i * 14;
-                    if (Engine.mouseY >= cy - 4 && Engine.mouseY < cy + 10) {
+                for (let i = 0; i < L.n; i++) {
+                    const cy = L.boxY + 8 + i * L.rowH;
+                    if (Engine.mouseY >= cy && Engine.mouseY < cy + L.rowH) {
                         this.selectedChoice = i;
-                        const choice = this.choiceData.options[this.selectedChoice];
-                        if (this.onComplete) this.onComplete(choice);
+                        if (this.onComplete) this.onComplete(this.choiceData.options[i]);
                         return;
                     }
                 }
@@ -108,23 +86,18 @@ const Dialogue = {
             return;
         }
 
-        // Typing effect
         if (this.charIndex < this.fullText.length) {
             this.charTimer += dt;
             while (this.charTimer >= this.charSpeed && this.charIndex < this.fullText.length) {
                 this.charTimer -= this.charSpeed;
                 this.charIndex++;
                 this.displayedText = this.fullText.substring(0, this.charIndex);
-
-                // Play blip
                 this.blipTimer += this.charSpeed;
-                if (this.blipTimer >= 0.06 && this.fullText[this.charIndex - 1] !== ' ') {
-                    Audio.playBlip(this.speaker);
+                if (this.blipTimer >= 0.05 && this.fullText[this.charIndex - 1] !== ' ') {
+                    if (typeof Audio !== 'undefined' && Audio.playBlip) Audio.playBlip(this.speaker);
                     this.blipTimer = 0;
                 }
             }
-
-            // Click/space to skip typing
             if (Engine.anyInteract()) {
                 this.displayedText = this.fullText;
                 this.charIndex = this.fullText.length;
@@ -132,7 +105,6 @@ const Dialogue = {
         } else if (!this.waitingForInput) {
             this.waitingForInput = true;
         } else if (Engine.anyInteract()) {
-            // Advance to next line
             this.currentIndex++;
             if (this.currentIndex >= this.queue.length) {
                 this.active = false;
@@ -143,91 +115,91 @@ const Dialogue = {
         }
     },
 
+    panel(ctx, x, y, w, h) {
+        // drop shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.35)';
+        Engine.roundRect(ctx, x + 1.5, y + 2, w, h, 7); ctx.fill();
+        // body
+        ctx.fillStyle = 'rgba(20,17,28,0.93)';
+        Engine.roundRect(ctx, x, y, w, h, 7); ctx.fill();
+        // gold border
+        ctx.strokeStyle = 'rgba(212,180,131,0.85)'; ctx.lineWidth = 0.8;
+        Engine.roundRect(ctx, x + 0.4, y + 0.4, w - 0.8, h - 0.8, 7); ctx.stroke();
+    },
+
     render(ctx) {
         if (!this.active) return;
+        const W = Engine.W;
 
-        // Handle choice rendering
         if (this.choiceData) {
-            const boxH = 10 + this.choiceData.options.length * 14;
-            const boxY = Engine.H - boxH - 8;
-
-            // Box background
-            ctx.fillStyle = 'rgba(10, 10, 20, 0.92)';
-            ctx.fillRect(8, boxY, Engine.W - 16, boxH);
-            ctx.strokeStyle = '#d4c9a8';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(8.5, boxY + 0.5, Engine.W - 17, boxH - 1);
-
-            // Options
-            ctx.font = '8px monospace';
-            for (let i = 0; i < this.choiceData.options.length; i++) {
-                const cy = boxY + 10 + i * 14;
-                if (i === this.selectedChoice) {
-                    ctx.fillStyle = '#ffd700';
-                    ctx.fillText('▸ ' + this.choiceData.options[i].text, 16, cy);
+            const L = this.choiceLayout();
+            this.panel(ctx, L.bx, L.boxY, L.bw, L.boxH);
+            ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+            for (let i = 0; i < L.n; i++) {
+                const cy = L.boxY + 8 + i * L.rowH;
+                const sel = i === this.selectedChoice;
+                if (sel) {
+                    ctx.fillStyle = 'rgba(255,210,90,0.16)';
+                    Engine.roundRect(ctx, L.bx + 5, cy, L.bw - 10, L.rowH - 2, 4); ctx.fill();
+                    ctx.fillStyle = '#ffd24a'; ctx.font = Engine.font(9, 700);
+                    ctx.fillText('▸', L.bx + 12, cy + L.rowH / 2);
+                    ctx.fillStyle = '#ffe9bd'; ctx.font = Engine.font(9, 600);
                 } else {
-                    ctx.fillStyle = '#a0a0b0';
-                    ctx.fillText('  ' + this.choiceData.options[i].text, 16, cy);
+                    ctx.fillStyle = '#b6aea0'; ctx.font = Engine.font(9, 400);
                 }
+                ctx.fillText(this.choiceData.options[i].text, L.bx + 22, cy + L.rowH / 2);
             }
+            ctx.textBaseline = 'alphabetic';
             return;
         }
 
-        // Dialogue box
-        const boxH = 44;
-        const boxY = Engine.H - boxH - 4;
-        const portraitSize = 36;
+        const boxH = this.boxH, boxY = this.boxY;
         const hasPortrait = this.portrait && this.portrait.length > 0;
-        const textX = hasPortrait ? 52 : 14;
-        const textW = hasPortrait ? Engine.W - 64 : Engine.W - 28;
+        const pad = 12;
+        const portraitSize = 40;
+        const textX = hasPortrait ? 8 + portraitSize + 12 : pad + 4;
+        const textW = W - textX - pad;
 
-        // Box background
-        ctx.fillStyle = 'rgba(10, 10, 20, 0.92)';
-        ctx.fillRect(4, boxY, Engine.W - 8, boxH);
-        ctx.strokeStyle = '#d4c9a8';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(4.5, boxY + 0.5, Engine.W - 9, boxH - 1);
+        this.panel(ctx, 6, boxY, W - 12, boxH);
 
-        // Portrait — prefer high-quality loaded art, fall back to procedural
         if (hasPortrait) {
             const artPrt = (typeof Assets !== 'undefined') ? Assets.getPortrait(this.portrait) : null;
+            const fx = 10, fy = boxY + (boxH - portraitSize) / 2;
+            ctx.fillStyle = '#0e0b08';
+            Engine.roundRect(ctx, fx - 1.5, fy - 1.5, portraitSize + 3, portraitSize + 3, 4); ctx.fill();
             if (artPrt) {
-                // Frame the portrait
-                ctx.fillStyle = '#1a1410';
-                ctx.fillRect(7, boxY + 3, portraitSize + 2, portraitSize + 2);
+                ctx.save();
+                Engine.roundRect(ctx, fx, fy, portraitSize, portraitSize, 3); ctx.clip();
                 ctx.imageSmoothingEnabled = true;
-                ctx.drawImage(artPrt, 8, boxY + 4, portraitSize, portraitSize);
+                ctx.drawImage(artPrt, fx, fy, portraitSize, portraitSize);
                 ctx.imageSmoothingEnabled = false;
-                ctx.strokeStyle = '#d4c9a8';
-                ctx.lineWidth = 1;
-                ctx.strokeRect(7.5, boxY + 3.5, portraitSize + 1, portraitSize + 1);
+                ctx.restore();
             } else {
                 const prt = Sprites.getPortrait(this.portrait);
-                if (prt) {
-                    ctx.drawImage(prt, 8, boxY + 4, portraitSize, portraitSize);
-                }
+                if (prt) ctx.drawImage(prt, fx, fy, portraitSize, portraitSize);
             }
+            ctx.strokeStyle = 'rgba(212,180,131,0.85)'; ctx.lineWidth = 0.8;
+            Engine.roundRect(ctx, fx, fy, portraitSize, portraitSize, 3); ctx.stroke();
         }
 
-        // Speaker name
+        let ty = boxY + 13;
         if (this.speaker) {
-            ctx.fillStyle = '#ffd700';
-            ctx.font = '7px monospace';
-            ctx.fillText(this.speaker, textX, boxY + 10);
+            ctx.fillStyle = '#ffd24a';
+            ctx.font = Engine.font(9, 700);
+            ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+            ctx.fillText(this.speaker, textX, ty);
+            ty += 13;
+        } else {
+            ty = boxY + 16;
         }
+        Engine.drawText(ctx, this.displayedText, textX, ty, textW, '#f1e9d8', 9, 12, 400);
 
-        // Text
-        ctx.fillStyle = '#e8e0d0';
-        ctx.font = '7px monospace';
-        const textY = this.speaker ? boxY + 20 : boxY + 12;
-        Engine.drawText(ctx, this.displayedText, textX, textY, textW, '#e8e0d0', 7, 9);
-
-        // Continue indicator
         if (this.waitingForInput) {
             const blink = Math.sin(Engine.frameCount * 0.1) > 0;
             if (blink) {
-                ctx.fillStyle = '#ffd700';
-                ctx.fillText('▼', Engine.W - 16, boxY + boxH - 6);
+                ctx.fillStyle = '#ffd24a';
+                ctx.font = Engine.font(8, 700);
+                ctx.fillText('▼', W - 18, boxY + boxH - 7);
             }
         }
     },

@@ -1,12 +1,13 @@
-// Paper Boats — Image Asset Loader (AI-generated pixel art + downloaded art)
+// Paper Boats — Image Asset Loader (Kenney CC0 tiles + AI painted art)
 const Assets = {
     images: {},
     loaded: 0,
     total: 0,
     ready: false,
 
-    // Map of logical key -> file path
     manifest: {
+        // Tileset atlas (Kenney Tiny Town, CC0)
+        'tiles_tiny_town': 'assets/tiles/tiny_town.png',
         // Portraits (key matches dialogue "portrait" field)
         'portrait_minh': 'assets/art/portrait_minh_sm.png',
         'portrait_thu_normal': 'assets/art/portrait_thu_normal_sm.png',
@@ -15,9 +16,12 @@ const Assets = {
         'portrait_ba_noi_normal': 'assets/art/portrait_ba_noi_sm.png',
         'portrait_ba_noi_crying': 'assets/art/portrait_ba_noi_crying_sm.png',
         'portrait_ong_tu': 'assets/art/portrait_ong_tu_sm.png',
-        // Backgrounds
+        // Painted backgrounds (AI)
         'bg_title': 'assets/art/bg_title_sm.png',
         'bg_festival': 'assets/art/bg_festival_sm.png',
+        'bg_sky_dusk': 'assets/art/bg_sky_dusk_sm.png',
+        'bg_night_river': 'assets/art/bg_night_river_sm.png',
+        'bg_letter': 'assets/art/bg_letter_sm.png',
     },
 
     init(onReady) {
@@ -28,22 +32,13 @@ const Assets = {
 
         keys.forEach(key => {
             const img = new Image();
-            img.onload = () => {
+            const done = () => {
                 this.loaded++;
-                if (this.loaded >= this.total) {
-                    this.ready = true;
-                    if (onReady) onReady();
-                }
+                if (key === 'tiles_tiny_town' && typeof Tileset !== 'undefined') Tileset.init(img);
+                if (this.loaded >= this.total) { this.ready = true; if (onReady) onReady(); }
             };
-            img.onerror = () => {
-                // Count as loaded even on error so the game still runs (procedural fallback)
-                this.loaded++;
-                this.images[key] = null;
-                if (this.loaded >= this.total) {
-                    this.ready = true;
-                    if (onReady) onReady();
-                }
-            };
+            img.onload = done;
+            img.onerror = () => { this.images[key] = null; done(); };
             img.src = this.manifest[key];
             this.images[key] = img;
         });
@@ -55,7 +50,5 @@ const Assets = {
         return null;
     },
 
-    getPortrait(name) {
-        return this.get('portrait_' + name);
-    },
+    getPortrait(name) { return this.get('portrait_' + name); },
 };

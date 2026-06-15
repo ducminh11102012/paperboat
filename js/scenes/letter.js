@@ -51,6 +51,15 @@ const LetterScene = {
             '',
             '',
             `Memories kept: ${Engine.memoriesKept} / 4`,
+            '',
+            '',
+            'Art & Tiles',
+            'Tileset: Kenney.nl — Tiny Town (CC0)',
+            'Backgrounds & portraits: AI painted',
+            'Font: Be Vietnam Pro',
+            '',
+            'Cảm ơn Kenney.nl',
+            '',
         ];
     },
 
@@ -131,11 +140,8 @@ const LetterScene = {
                     const a = Math.min(1, (this.timer - 1) * 0.5);
                     ctx.globalAlpha = a;
                     // Sound of water...
-                    ctx.fillStyle = '#505060';
-                    ctx.font = '7px monospace';
                     const waterText = Engine.locale === 'vi' ? '...tiếng nước chảy...' : '...the sound of flowing water...';
-                    const ww = ctx.measureText(waterText).width;
-                    ctx.fillText(waterText, (Engine.W - ww) / 2, Engine.H / 2);
+                    Engine.drawTextCentered(ctx, waterText, Engine.H / 2, '#707085', 8, 400);
                     ctx.globalAlpha = 1;
                 }
                 break;
@@ -157,11 +163,8 @@ const LetterScene = {
 
                 if (this.timer > 1.5) {
                     ctx.globalAlpha = Math.min(1, (this.timer - 1.5) * 0.7);
-                    ctx.fillStyle = '#a09080';
-                    ctx.font = '8px monospace';
                     const endText = Engine.locale === 'vi' ? 'Cảm ơn bạn đã chơi.' : 'Thank you for playing.';
-                    const ew = ctx.measureText(endText).width;
-                    ctx.fillText(endText, (Engine.W - ew) / 2, Engine.H / 2);
+                    Engine.drawTextCentered(ctx, endText, Engine.H / 2, '#c8b89a', 10, 600);
                     ctx.globalAlpha = 1;
                 }
                 break;
@@ -169,78 +172,78 @@ const LetterScene = {
     },
 
     renderCredits(ctx) {
-        ctx.font = '8px monospace';
-        let y = this.scrollY;
+        // soft starry dusk backdrop
+        const g = ctx.createLinearGradient(0, 0, 0, Engine.H);
+        g.addColorStop(0, '#0c1024'); g.addColorStop(1, '#161228');
+        ctx.fillStyle = g; ctx.fillRect(0, 0, Engine.W, Engine.H);
 
+        let y = this.scrollY;
         for (const line of this.creditLines) {
-            if (y > -10 && y < Engine.H + 10) {
-                if (line === 'Paper Boats') {
-                    ctx.fillStyle = '#e8d8c0';
-                    ctx.font = 'bold 12px monospace';
-                } else if (line.startsWith('Memories')) {
-                    ctx.fillStyle = '#ffd700';
-                    ctx.font = '7px monospace';
-                } else {
-                    ctx.fillStyle = '#a0a0b0';
-                    ctx.font = '8px monospace';
-                }
-                const w = ctx.measureText(line).width;
-                ctx.fillText(line, (Engine.W - w) / 2, y);
+            if (y > -10 && y < Engine.H + 10 && line !== '') {
+                let col = '#a7a7c0', sz = 8, wt = 400;
+                if (line === 'Paper Boats') { col = '#f0e3c4'; sz = 13; wt = 700; }
+                else if (line === 'Thuyền Giấy') { col = '#d8c8a0'; sz = 10; wt = 600; }
+                else if (line.startsWith('Memories')) { col = '#ffd76a'; sz = 8; wt = 600; }
+                else if (line === 'Art & Tiles') { col = '#8fb0d8'; sz = 8; wt = 600; }
+                Engine.drawTextCentered(ctx, line, y, col, sz, wt);
             }
             y += 14;
         }
     },
 
     renderLetter(ctx) {
-        // Paper texture background
-        ctx.globalAlpha = this.paperAlpha || 1;
-
-        // Old paper
-        ctx.fillStyle = '#d8c8a0';
-        const margin = 20;
-        ctx.fillRect(margin, 6, Engine.W - margin * 2, Engine.H - 12);
-
-        // Paper texture effect
-        ctx.fillStyle = '#c8b890';
-        for (let i = 0; i < 30; i++) {
-            const px = margin + 5 + (i * 37) % (Engine.W - margin * 2 - 10);
-            const py = 10 + (i * 23) % (Engine.H - 20);
-            ctx.fillRect(px, py, 2, 1);
+        // Painted dawn riverbank behind the letter
+        const art = (typeof Assets !== 'undefined') ? Assets.get('bg_letter') : null;
+        if (art) {
+            ctx.imageSmoothingEnabled = true;
+            ctx.drawImage(art, 0, 0, Engine.W, Engine.H);
+            ctx.imageSmoothingEnabled = false;
+            ctx.fillStyle = 'rgba(10,8,16,0.30)';
+            ctx.fillRect(0, 0, Engine.W, Engine.H);
+        } else {
+            ctx.fillStyle = '#0a0a0f'; ctx.fillRect(0, 0, Engine.W, Engine.H);
         }
 
-        // Slight fold line
-        ctx.fillStyle = '#c0b080';
-        ctx.fillRect(margin, Engine.H / 2, Engine.W - margin * 2, 1);
+        ctx.globalAlpha = this.paperAlpha || 1;
+
+        // Parchment sheet (centred, with soft shadow)
+        const margin = 24;
+        const px0 = margin, py0 = 8, pw = Engine.W - margin * 2, ph = Engine.H - 16;
+        ctx.fillStyle = 'rgba(0,0,0,0.35)';
+        Engine.roundRect(ctx, px0 + 2, py0 + 3, pw, ph, 4); ctx.fill();
+        const pg = ctx.createLinearGradient(0, py0, 0, py0 + ph);
+        pg.addColorStop(0, '#f2e7c9'); pg.addColorStop(1, '#e6d6ad');
+        ctx.fillStyle = pg;
+        Engine.roundRect(ctx, px0, py0, pw, ph, 4); ctx.fill();
+        ctx.strokeStyle = 'rgba(150,120,80,0.5)'; ctx.lineWidth = 0.7;
+        Engine.roundRect(ctx, px0 + 0.4, py0 + 0.4, pw - 0.8, ph - 0.8, 4); ctx.stroke();
+
+        // subtle speckle texture
+        ctx.fillStyle = 'rgba(180,150,100,0.25)';
+        for (let i = 0; i < 26; i++) {
+            const sx = px0 + 5 + (i * 53) % (pw - 10);
+            const sy = py0 + 6 + (i * 29) % (ph - 12);
+            ctx.fillRect(sx, sy, 1, 1);
+        }
 
         // Letter text
-        ctx.font = '6px monospace';
-        let y = 18 - this.scrollY;
-        const textX = margin + 8;
-        const maxW = Engine.W - margin * 2 - 16;
+        let y = 20 - this.scrollY;
+        const textX = px0 + 12;
+        const maxW = pw - 24;
 
         for (let i = 0; i < this.letterLines.length; i++) {
             const line = this.letterLines[i];
-            if (y > 8 && y < Engine.H - 16) {
-                if (i === 0) {
-                    // "Dear..." line
-                    ctx.fillStyle = '#3a2a1a';
-                    ctx.font = '7px monospace';
-                } else if (line.startsWith('—')) {
-                    ctx.fillStyle = '#4a3a2a';
-                    ctx.font = 'bold 7px monospace';
-                } else {
-                    ctx.fillStyle = '#4a3a20';
-                    ctx.font = '6px monospace';
-                }
-
+            if (y > 6 && y < Engine.H - 12) {
+                let col = '#4a3a20', sz = 8, wt = 400;
+                if (i === 0) { col = '#3a2a1a'; sz = 9; wt = 600; }
+                else if (line.startsWith('—')) { col = '#4a3a2a'; sz = 8; wt = 600; }
                 if (line === '') {
-                    y += 4;
+                    y += 5;
                 } else {
-                    // Word wrap
-                    y = Engine.drawText(ctx, line, textX, y, maxW, ctx.fillStyle, 6, 8);
+                    y = Engine.drawText(ctx, line, textX, y, maxW, col, sz, sz + 3, wt);
                 }
             } else {
-                y += line === '' ? 4 : 8;
+                y += line === '' ? 5 : 11;
             }
         }
 
@@ -250,7 +253,7 @@ const LetterScene = {
             if (y > 8 && y < Engine.H - 16) {
                 ctx.fillStyle = '#5a4a30';
                 ctx.font = '6px monospace';
-                Engine.drawText(ctx, this.psText, textX, y, maxW, '#5a4a30', 6, 8);
+                Engine.drawText(ctx, this.psText, textX, y, maxW, '#5a4a30', 8, 11, 400);
                 y += 12;
             }
         }
@@ -261,7 +264,7 @@ const LetterScene = {
             if (y > 8 && y < Engine.H - 16) {
                 ctx.fillStyle = '#6a5a30';
                 ctx.font = '6px monospace';
-                Engine.drawText(ctx, this.thanksText, textX, y, maxW, '#6a5a30', 6, 8);
+                Engine.drawText(ctx, this.thanksText, textX, y, maxW, '#6a5a30', 8, 11, 600);
             }
         }
 

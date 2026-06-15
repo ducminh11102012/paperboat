@@ -1,5 +1,6 @@
 // Paper Boats — Title Screen & Language Select
 const TitleScene = {
+    showHud: false,
     phase: 'title', // 'title', 'language'
     selectedLang: 0,
     starTimer: 0,
@@ -50,10 +51,10 @@ const TitleScene = {
 
             // Mouse selection
             if (Engine.mouseClicked) {
-                if (Engine.mouseY >= 95 && Engine.mouseY < 109) {
+                if (Engine.mouseY >= 98 && Engine.mouseY < 113) {
                     this.selectedLang = 0;
                     this.selectLanguage();
-                } else if (Engine.mouseY >= 109 && Engine.mouseY < 123) {
+                } else if (Engine.mouseY >= 113 && Engine.mouseY < 129) {
                     this.selectedLang = 1;
                     this.selectLanguage();
                 }
@@ -143,55 +144,46 @@ const TitleScene = {
 
         // Title
         ctx.globalAlpha = this.titleAlpha;
-        ctx.fillStyle = '#e8d8c0';
-        ctx.font = 'bold 16px monospace';
-        const titleText = 'Paper Boats';
-        const tw = ctx.measureText(titleText).width;
-        ctx.fillText(titleText, Math.floor((Engine.W - tw) / 2), 40);
-
-        // Subtitle
-        ctx.fillStyle = '#a0a0b0';
-        ctx.font = '8px monospace';
-        const subText = 'Thuyền Giấy';
-        const sw = ctx.measureText(subText).width;
-        ctx.fillText(subText, Math.floor((Engine.W - sw) / 2), 54);
+        ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+        // glow
+        ctx.save();
+        ctx.shadowColor = 'rgba(255,200,120,0.55)';
+        ctx.shadowBlur = 8;
+        ctx.fillStyle = '#f3e6cf';
+        ctx.font = Engine.font(30, 700);
+        ctx.fillText('Paper Boats', Engine.W / 2, 44);
+        ctx.restore();
+        // subtitle
+        ctx.fillStyle = '#e7c98f';
+        ctx.font = Engine.font(13, 600);
+        ctx.fillText('Thuyền Giấy', Engine.W / 2, 60);
 
         if (this.phase === 'title') {
-            // Blink prompt
-            if (Math.sin(Engine.frameCount * 0.06) > 0) {
-                ctx.fillStyle = '#a0a0b0';
-                ctx.font = '7px monospace';
-                const pt = Engine.t('press_space');
-                const pw = ctx.measureText(pt).width;
-                ctx.fillText(pt, Math.floor((Engine.W - pw) / 2), Engine.H - 20);
+            if (Math.sin(Engine.frameCount * 0.06) > -0.2) {
+                ctx.fillStyle = 'rgba(245,235,215,0.85)';
+                ctx.font = Engine.font(9, 600);
+                ctx.fillText(Engine.t('press_space'), Engine.W / 2, Engine.H - 22);
             }
         } else if (this.phase === 'language') {
-            // Language selection
-            ctx.fillStyle = '#a0a0b0';
-            ctx.font = '8px monospace';
-            const clText = Engine.locale === 'vi' ? 'Chọn ngôn ngữ / Choose language' : 'Choose language / Chọn ngôn ngữ';
-            const clW = ctx.measureText(clText).width;
-            ctx.fillText(clText, Math.floor((Engine.W - clW) / 2), 85);
-
+            ctx.fillStyle = '#d8cdb8';
+            ctx.font = Engine.font(9, 600);
+            ctx.fillText('Chọn ngôn ngữ · Choose language', Engine.W / 2, 86);
             const langs = ['Tiếng Việt', 'English'];
             langs.forEach((lang, i) => {
-                const ly = 100 + i * 14;
-                if (i === this.selectedLang) {
-                    ctx.fillStyle = '#ffd700';
-                    ctx.font = '8px monospace';
-                    const lt = '▸ ' + lang;
-                    const lw = ctx.measureText(lt).width;
-                    ctx.fillText(lt, Math.floor((Engine.W - lw) / 2), ly);
-                } else {
-                    ctx.fillStyle = '#808090';
-                    ctx.font = '8px monospace';
-                    const lt = '  ' + lang;
-                    const lw = ctx.measureText(lt).width;
-                    ctx.fillText(lt, Math.floor((Engine.W - lw) / 2), ly);
+                const ly = 98 + i * 16, bw = 120, bx = (Engine.W - bw) / 2;
+                const sel = i === this.selectedLang;
+                if (sel) {
+                    ctx.fillStyle = 'rgba(255,210,90,0.18)';
+                    Engine.roundRect(ctx, bx, ly, bw, 14, 5); ctx.fill();
+                    ctx.strokeStyle = 'rgba(255,210,90,0.6)'; ctx.lineWidth = 0.7;
+                    Engine.roundRect(ctx, bx + 0.3, ly + 0.3, bw - 0.6, 13.4, 5); ctx.stroke();
                 }
+                ctx.fillStyle = sel ? '#ffe6a8' : '#9a92a4';
+                ctx.font = Engine.font(9.5, sel ? 700 : 400);
+                ctx.fillText(lang, Engine.W / 2, ly + 10);
             });
         }
-
         ctx.globalAlpha = 1;
+        ctx.textAlign = 'left';
     },
 };
