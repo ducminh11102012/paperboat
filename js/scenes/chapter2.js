@@ -86,6 +86,10 @@ const Chapter2Scene = {
                 this.updateFireflyGame(dt);
                 break;
 
+            case 'minigame_boat':
+                this.updateBoatGame(dt);
+                break;
+
             case 'explore_between':
                 Player.update(dt, (x, y) => TileMap.checkCollision(this.map, x, y));
                 Dialogue.update(dt);
@@ -159,6 +163,7 @@ const Chapter2Scene = {
         // Check if caught enough
         if (this.caughtFireflies >= 5) {
             Engine.keepMemory('mem_fireflies');
+            if (typeof Notebook !== 'undefined') Notebook.addClue('firefly_souls');
             this.phase = 'scene_fireflies';
             Dialogue.startRaw(Engine.getDialogue('ch2_fireflies_end'), () => {
                 this.startBoatsScene();
@@ -183,16 +188,67 @@ const Chapter2Scene = {
         Dialogue.startRaw(Engine.getDialogue('ch2_boats'), () => {
             Dialogue.showChoice('ch2_boats_choice', (choice) => {
                 if (choice.memory) Engine.keepMemory(choice.memory);
-                Dialogue.startRaw(Engine.getDialogue(choice.next), () => {
-                    this.startJealousyScene();
-                });
+                if (choice.next === 'ch2_boats_teach') {
+                    // Interactive fold: the player actually folds the boat with Thu
+                    this.startBoatFold();
+                } else {
+                    Dialogue.startRaw(Engine.getDialogue(choice.next), () => {
+                        this.startJealousyScene();
+                    });
+                }
             });
         });
+    },
+
+    // ---- Paper-boat folding mini-game ------------------------------------
+    startBoatFold() {
+        this.phase = 'minigame_boat';
+        this.boatStep = 0;
+        this.boatShake = 0;
+        this.boatStageT = 1;     // ease-in of the current stage shape
+        this.boatSteps = [
+            { key: 'ArrowDown',  vi: 'Gập đôi tờ giấy xuống', en: 'Fold the sheet in half', arrow: '↓' },
+            { key: 'ArrowRight', vi: 'Miết mép cho thật thẳng', en: 'Crease the edge flat',  arrow: '→' },
+            { key: 'ArrowUp',    vi: 'Bẻ hai góc lên thành mũ', en: 'Bend the corners up',   arrow: '↑' },
+            { key: 'ArrowLeft',  vi: 'Mở bụng thuyền ra',      en: 'Open out the hull',      arrow: '←' },
+            { key: 'Space',      vi: 'Vuốt nhẹ cho thuyền nở',  en: 'Smooth it into shape',   arrow: '○' },
+        ];
+        if (typeof Audio !== 'undefined' && Audio.stopMusic) { /* keep music */ }
+    },
+
+    updateBoatGame(dt) {
+        this.timer += dt;
+        if (this.boatShake > 0) this.boatShake = Math.max(0, this.boatShake - dt);
+        if (this.boatStageT < 1) this.boatStageT = Math.min(1, this.boatStageT + dt * 4);
+
+        const step = this.boatSteps[this.boatStep];
+        if (!step) return;
+        // any of the matching inputs advances; wrong arrow = gentle shake (no fail)
+        const want = step.key;
+        const pressedRight = Engine.justPressed(want)
+            || (want === 'Space' && (Engine.justPressed('Enter') || Engine.justPressed('KeyZ') || Engine.mouseClicked));
+        const pressedAnyArrow = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].some(k => Engine.justPressed(k));
+
+        if (pressedRight) {
+            this.boatStep++;
+            this.boatStageT = 0;
+            if (typeof Audio !== 'undefined' && Audio.playSFX) Audio.playSFX('firefly_catch');
+            if (this.boatStep >= this.boatSteps.length) {
+                if (typeof Notebook !== 'undefined') Notebook.addClue('thu_cold_hands');
+                this.phase = 'scene_boats';
+                Dialogue.startRaw(Engine.getDialogue('ch2_boats_teach'), () => {
+                    this.startJealousyScene();
+                });
+            }
+        } else if (pressedAnyArrow) {
+            this.boatShake = 0.25;
+        }
     },
 
     startJealousyScene() {
         this.phase = 'scene_jealousy';
         Dialogue.startRaw(Engine.getDialogue('ch2_jealousy'), () => {
+            if (typeof Notebook !== 'undefined') { Notebook.meetPerson('bap'); Notebook.addClue('bap_cant_see'); }
             Dialogue.startRaw(Engine.getDialogue('ch2_jealousy_after'), () => {
                 this.startSongScene();
             });
@@ -213,6 +269,7 @@ const Chapter2Scene = {
 
     startWishScene() {
         this.phase = 'scene_wish';
+        if (typeof Notebook !== 'undefined') Notebook.addClue('thu_wish');
         Dialogue.startRaw(Engine.getDialogue('ch2_wish'), () => {
             this.startGhostFestival();
         });
@@ -225,6 +282,7 @@ const Chapter2Scene = {
             // 2-second silence pause
             setTimeout(() => {
                 Audio.playMusic('village_day');
+                if (typeof Notebook !== 'undefined') Notebook.addClue('thu_vanish_ram');
                 Dialogue.startRaw(Engine.getDialogue('ch2_ghost_festival_after'), () => {
                     this.startSilenceScene();
                 });
@@ -256,6 +314,11 @@ const Chapter2Scene = {
 
         if (this.phase === 'minigame_fireflies') {
             this.renderFireflyGame(ctx);
+            return;
+        }
+
+        if (this.phase === 'minigame_boat') {
+            this.renderBoatGame(ctx);
             return;
         }
 
@@ -310,6 +373,104 @@ const Chapter2Scene = {
         ctx.fillRect(0, 0, Engine.W, Engine.H);
         ctx.fillStyle = '#3a5a2a';
         ctx.fillRect(0, Engine.H * 0.6, Engine.W, Engine.H * 0.4);
+    },
+
+    renderBoatGame(ctx) {
+        const W = Engine.W, H = Engine.H;
+        // dusk riverside background
+        if (!this.drawPaintedBG(ctx, 'bg_sky_dusk', 'rgba(20,16,30,0.25)')) {
+            const g = ctx.createLinearGradient(0, 0, 0, H);
+            g.addColorStop(0, '#42506e'); g.addColorStop(0.6, '#5a4a52'); g.addColorStop(1, '#2a3a3a');
+            ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+        }
+        // water strip
+        ctx.fillStyle = 'rgba(30,50,70,0.55)';
+        ctx.fillRect(0, H * 0.72, W, H * 0.28);
+
+        // header
+        Engine.drawTextCentered(ctx, Engine.locale === 'vi' ? 'GẤP THUYỀN GIẤY' : 'FOLD THE PAPER BOAT', 20, '#ffe6a8', 10, 800);
+
+        // paper / boat shape, with a little shake on a wrong press
+        const total = this.boatSteps.length;
+        const stage = this.boatStep;
+        let cx = W / 2, cy = H * 0.5;
+        if (this.boatShake > 0) cx += Math.sin(Engine.frameCount * 0.9) * this.boatShake * 10;
+        this.drawPaperStage(ctx, cx, cy, stage, total);
+
+        // progress dots
+        const dotY = H * 0.68, gap = 9, startX = W / 2 - (total - 1) * gap / 2;
+        for (let i = 0; i < total; i++) {
+            ctx.fillStyle = i < this.boatStep ? '#ffd24a' : 'rgba(255,255,255,0.25)';
+            ctx.beginPath(); ctx.arc(startX + i * gap, dotY, 2, 0, Math.PI * 2); ctx.fill();
+        }
+
+        // current instruction + big arrow key
+        const step = this.boatSteps[this.boatStep];
+        if (step) {
+            const label = Engine.locale === 'vi' ? step.vi : step.en;
+            // arrow chip
+            const chipY = H - 30, chipS = 16;
+            ctx.fillStyle = 'rgba(18,14,9,0.9)';
+            Engine.roundRect(ctx, W / 2 - chipS / 2, chipY, chipS, chipS, 4); ctx.fill();
+            ctx.strokeStyle = '#ffd24a'; ctx.lineWidth = 0.8;
+            Engine.roundRect(ctx, W / 2 - chipS / 2, chipY, chipS, chipS, 4); ctx.stroke();
+            ctx.fillStyle = '#ffe6a8'; ctx.font = Engine.font(11, 800);
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(step.arrow, W / 2, chipY + chipS / 2 + 0.5);
+            ctx.textBaseline = 'alphabetic';
+            Engine.drawTextCentered(ctx, label, H - 8, '#f1e9d8', 8, 600);
+        }
+    },
+
+    // Draw the paper morphing flat sheet -> boat across stages 0..total
+    drawPaperStage(ctx, cx, cy, stage, total) {
+        ctx.save();
+        ctx.translate(cx, cy);
+        const paper = '#f4efe2', shade = '#d8d0bd', edge = 'rgba(120,110,90,0.6)';
+        ctx.strokeStyle = edge; ctx.lineWidth = 0.7; ctx.lineJoin = 'round';
+        const S = 1.0;
+        if (stage <= 0) {
+            // flat sheet
+            ctx.fillStyle = paper; ctx.fillRect(-26, -18, 52, 36);
+            ctx.strokeRect(-26, -18, 52, 36);
+            ctx.strokeStyle = shade; ctx.beginPath(); ctx.moveTo(0, -18); ctx.lineTo(0, 18); ctx.stroke();
+        } else if (stage === 1) {
+            // folded in half
+            ctx.fillStyle = paper; ctx.fillRect(-26, -9, 52, 18);
+            ctx.strokeRect(-26, -9, 52, 18);
+            ctx.fillStyle = shade; ctx.fillRect(-26, -9, 52, 3);
+        } else if (stage === 2) {
+            // triangle (hat base)
+            ctx.fillStyle = paper;
+            ctx.beginPath(); ctx.moveTo(0, -20); ctx.lineTo(26, 12); ctx.lineTo(-26, 12); ctx.closePath(); ctx.fill(); ctx.stroke();
+            ctx.strokeStyle = shade; ctx.beginPath(); ctx.moveTo(0, -20); ctx.lineTo(0, 12); ctx.stroke();
+        } else if (stage === 3) {
+            // hat (triangle + brim)
+            ctx.fillStyle = paper;
+            ctx.beginPath(); ctx.moveTo(0, -20); ctx.lineTo(24, 6); ctx.lineTo(-24, 6); ctx.closePath(); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = shade;
+            ctx.beginPath(); ctx.moveTo(-26, 6); ctx.lineTo(26, 6); ctx.lineTo(20, 12); ctx.lineTo(-20, 12); ctx.closePath(); ctx.fill(); ctx.stroke();
+        } else {
+            // finished boat (hull + sail), gently bobbing
+            const bob = Math.sin(Engine.frameCount * 0.06) * 1.2;
+            ctx.translate(0, bob);
+            ctx.fillStyle = paper;
+            // hull
+            ctx.beginPath();
+            ctx.moveTo(-28, 2); ctx.lineTo(28, 2); ctx.lineTo(18, 16); ctx.lineTo(-18, 16); ctx.closePath();
+            ctx.fill(); ctx.stroke();
+            // mid fold
+            ctx.strokeStyle = shade; ctx.beginPath(); ctx.moveTo(0, 2); ctx.lineTo(0, 16); ctx.stroke();
+            // sail / prow
+            ctx.fillStyle = paper; ctx.strokeStyle = edge;
+            ctx.beginPath(); ctx.moveTo(0, -18); ctx.lineTo(24, 1); ctx.lineTo(0, 1); ctx.closePath(); ctx.fill(); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, -18); ctx.lineTo(-24, 1); ctx.lineTo(0, 1); ctx.closePath(); ctx.fill(); ctx.stroke();
+            // reflection on water
+            ctx.globalAlpha = 0.18; ctx.fillStyle = '#cfe2ee';
+            ctx.beginPath(); ctx.moveTo(-18, 18); ctx.lineTo(18, 18); ctx.lineTo(12, 26); ctx.lineTo(-12, 26); ctx.closePath(); ctx.fill();
+            ctx.globalAlpha = 1;
+        }
+        ctx.restore();
     },
 
     renderFireflyGame(ctx) {
