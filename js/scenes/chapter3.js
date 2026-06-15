@@ -69,9 +69,12 @@ const Chapter3Scene = {
         this.ongTuNPC = new NPC('Ông Tư', 'ong_tu', 20 * 16, 12 * 16, 'left');
         this.npcs = [this.ongTuNPC];
 
+        // hotspots placed on WALKABLE tiles next to the solid grave/house tiles
         this.hotspots = [
-            new Hotspot(7 * 16, 4 * 16, 16, 16, 'grave', ''),
-            new Hotspot(8 * 16, 12 * 16, 16, 16, 'notebook', ''),
+            // grass just below the grave (grave tile itself is solid)
+            new Hotspot(7 * 16, 5 * 16, 16, 32, 'grave', ''),
+            // the door tile of grandma's house (house body is solid)
+            new Hotspot(8 * 16, 13 * 16, 16, 16, 'notebook', ''),
         ];
     },
 
