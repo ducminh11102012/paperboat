@@ -24,6 +24,8 @@ const Assets = {
         'bg_letter': 'assets/art/bg_letter_sm.png',
         // Village map screen (press M) — hand-painted overview
         'map_village': 'assets/art/village_map.webp',
+        // Painted village terrain used as the Chapter 1 gameplay ground
+        'village_ground': 'assets/art/village_ground.webp',
     },
 
     init(onReady) {

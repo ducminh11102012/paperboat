@@ -122,24 +122,25 @@ const Hud = {
             }
             // prompt pill bottom-center
             const txt = (this.prompt[this.L()] || this.prompt.vi);
-            const key = this.L() === 'vi' ? 'Space' : 'Space';
+            // size the key cap to actually fit the word "SPACE" (was clipping to "PAC")
+            ctx.font = Engine.font(6.5, 700);
+            const keyInner = ctx.measureText('SPACE').width + 7;
+            const keyW = keyInner + 2;
             ctx.font = Engine.font(8, 600);
-            const label = '  ' + txt;
-            const tw = ctx.measureText(label).width;
-            const keyW = 16;
-            const bw = tw + keyW + 16;
+            const tw = ctx.measureText(txt).width;
+            const bw = keyW + 10 + tw + 16;
             const bx = (W - bw) / 2, by = H - 30, bh = 15;
             ctx.fillStyle = 'rgba(18,16,26,0.82)';
             Engine.roundRect(ctx, bx, by, bw, bh, 6); ctx.fill();
             // key cap
             ctx.fillStyle = '#ffe6a8';
-            Engine.roundRect(ctx, bx + 5, by + 3.5, keyW - 2, bh - 7, 2.5); ctx.fill();
+            Engine.roundRect(ctx, bx + 5, by + 3.5, keyInner, bh - 7, 2.5); ctx.fill();
             ctx.fillStyle = '#3a2a08'; ctx.font = Engine.font(6.5, 700);
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillText('SPACE', bx + 5 + (keyW - 2) / 2, by + bh / 2 + 0.5);
+            ctx.fillText('SPACE', bx + 5 + keyInner / 2, by + bh / 2 + 0.5);
             ctx.fillStyle = '#f0e6d2'; ctx.font = Engine.font(8, 600);
             ctx.textAlign = 'left';
-            ctx.fillText(txt, bx + keyW + 8, by + bh / 2 + 0.5);
+            ctx.fillText(txt, bx + 5 + keyInner + 8, by + bh / 2 + 0.5);
             ctx.textBaseline = 'alphabetic';
         }
         this.prompt = null; // must be re-set each frame

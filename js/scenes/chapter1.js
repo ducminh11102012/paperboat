@@ -14,6 +14,12 @@ const Chapter1Scene = {
     thuNPC: null,
     baNoi: null,
 
+    // --- Painted village world (uses the hand-painted map as the real ground) ---
+    painted: true,
+    S: 0.70,                 // scale from the 1024x698 painted crop to world pixels
+    WORLD_W: 0, WORLD_H: 0,
+    blockers: [],            // solid rects in world px
+
     init() {
         this.phase = 'title_card';
         this.timer = 0;
@@ -22,8 +28,40 @@ const Chapter1Scene = {
         this.pondVisits = 0;
         this.metThu = false;
         this.createMap();
+        this.setupPaintedWorld();
         this.createNPCs();
-        Player.reset(10 * 16 + 8, 14 * 16);
+        // Start near the village gate / bus stop (entry point on the painted map)
+        const s = this.S;
+        Player.reset(Math.round(235 * s), Math.round(300 * s));
+    },
+
+    // Build world dimensions + solid blockers from the painted map landmarks.
+    // All source numbers are in the 1024x698 painted-crop space, scaled by S.
+    setupPaintedWorld() {
+        const s = this.S;
+        this.WORLD_W = Math.round(1024 * s);
+        this.WORLD_H = Math.round(698 * s);
+        const R = (x, y, w, h) => ({ x: x * s, y: y * s, w: w * s, h: h * s });
+        this.blockers = [
+            R(285, 30, 165, 100),   // 3 · nhà bà nội
+            R(455, 175, 165, 120),  // 5 · đình làng
+            R(55, 355, 170, 115),   // 8 · nhà ông tư
+            R(745, 180, 115, 110),  // 6 · gốc cây đa
+            R(905, 0, 120, 560),    // 10 · ruộng / hàng rào cánh đồng
+            R(40, 585, 430, 113),   // 11 · ao/sông (mặt nước trái)
+            R(300, 620, 360, 78),   // 12 · khúc sông phải
+        ];
+    },
+
+    collidePainted(x, y, w = 9, h = 5) {
+        if (x - w / 2 < 0 || x + w / 2 > this.WORLD_W || y - h / 2 < 0 || y + h / 2 > this.WORLD_H) return true;
+        const pts = [[x - w/2, y - h/2], [x + w/2, y - h/2], [x - w/2, y + h/2], [x + w/2, y + h/2]];
+        for (const b of this.blockers) {
+            for (const [px, py] of pts) {
+                if (px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h) return true;
+            }
+        }
+        return false;
     },
 
     createMap() {
@@ -86,25 +124,24 @@ const Chapter1Scene = {
     },
 
     createNPCs() {
+        const s = this.S;
         this.npcs = [];
-        // Bà Nội at house entrance
-        this.baNoi = new NPC('Bà Nội', 'ba_noi', 9 * 16, 9 * 16, 'down');
+        // Bà Nội in front of her house (landmark 3)
+        this.baNoi = new NPC('Bà Nội', 'ba_noi', Math.round(360 * s), Math.round(150 * s), 'down');
         this.npcs.push(this.baNoi);
 
-        // Thu (hidden at first, appears at pond)
-        this.thuNPC = new NPC('Thu', 'thu', 15 * 16, 14 * 16 + 8, 'down', true);
+        // Thu (hidden at first, appears on the river bank — landmark 12)
+        this.thuNPC = new NPC('Thu', 'thu', Math.round(470 * s), Math.round(575 * s), 'down', true);
         this.thuNPC.visible = false;
         this.npcs.push(this.thuNPC);
 
-        // Hotspots
-        // NOTE: hotspots must sit on WALKABLE tiles (not on the solid banyan/stone
-        // tiles themselves) so the player can stand inside them to press Space.
+        // Hotspots — placed on walkable ground next to the painted landmarks so the
+        // player can stand inside them and press Space to interact.
+        const H = (x, y, w, h, id, label) => new Hotspot(x * s, y * s, w * s, h * s, id, label);
         this.hotspots = [
-            // dirt path just below the banyan (rows 6-9, cols 4-5)
-            new Hotspot(4 * 16, 6 * 16, 32, 48, 'tree', 'Cây đa'),
-            new Hotspot(14 * 16, 14 * 16, 32, 16, 'pond', 'Bờ ao'),
-            // grass strip just below the đình stone wall (row 5, cols 23-27)
-            new Hotspot(23 * 16, 5 * 16, 80, 16, 'temple', 'Sân đình'),
+            H(700, 285, 80, 70, 'tree', 'Cây đa'),     // 6 · path below the banyan
+            H(225, 540, 160, 35, 'pond', 'Bờ sông'),   // 11 · river bank
+            H(470, 315, 100, 35, 'temple', 'Sân đình'),// 5 · in front of đình steps
         ];
     },
 
@@ -174,10 +211,12 @@ const Chapter1Scene = {
         this.npcs.forEach(n => n.update(dt));
 
         // Camera follow player
+        const worldW = this.painted ? this.WORLD_W : 30 * 16;
+        const worldH = this.painted ? this.WORLD_H : 20 * 16;
         this.cameraX = Player.x - Engine.W / 2;
         this.cameraY = Player.y - Engine.H / 2;
-        this.cameraX = Math.max(0, Math.min(this.cameraX, 30 * 16 - Engine.W));
-        this.cameraY = Math.max(0, Math.min(this.cameraY, 20 * 16 - Engine.H));
+        this.cameraX = Math.max(0, Math.min(this.cameraX, worldW - Engine.W));
+        this.cameraY = Math.max(0, Math.min(this.cameraY, worldH - Engine.H));
     },
 
     enterExplore() {
@@ -200,7 +239,9 @@ const Chapter1Scene = {
     },
 
     updateExplore(dt) {
-        Player.update(dt, (x, y) => TileMap.checkCollision(this.map, x, y));
+        Player.update(dt, (x, y) => this.painted
+            ? this.collidePainted(x, y)
+            : TileMap.checkCollision(this.map, x, y));
         Dialogue.update(dt);
         this.updateObjective();
         if (Dialogue.active) return;
@@ -230,8 +271,9 @@ const Chapter1Scene = {
             }
         }
 
-        // Track pond visits
-        if (Player.x > 12 * 16 && Player.x < 20 * 16 && Player.y > 13 * 16 && Player.y < 15 * 16) {
+        // Track pond visits (river bank area near landmark 11/12)
+        const s = this.S;
+        if (Player.x > 200 * s && Player.x < 540 * s && Player.y > 525 * s && Player.y < 580 * s) {
             if (!this._atPond) {
                 this._atPond = true;
                 this.pondVisits++;
@@ -303,8 +345,8 @@ const Chapter1Scene = {
         this.phase = 'unease';
         // Move player to home area
         this.baNoi.visible = true;
-        this.baNoi.x = 9 * 16;
-        this.baNoi.y = 9 * 16;
+        this.baNoi.x = Math.round(360 * this.S);
+        this.baNoi.y = Math.round(150 * this.S);
 
         Dialogue.startRaw(Engine.getDialogue('ch1_unease'), () => {
             // Transition to Chapter 2
@@ -329,7 +371,18 @@ const Chapter1Scene = {
         }
 
         // Render world
-        TileMap.renderMap(ctx, this.map, this.cameraX, this.cameraY, 1);
+        const ground = this.painted && typeof Assets !== 'undefined' ? Assets.get('village_ground') : null;
+        if (ground) {
+            ctx.fillStyle = '#2c3a22';
+            ctx.fillRect(0, 0, Engine.W, Engine.H);
+            const prev = ctx.imageSmoothingEnabled;
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(ground, -this.cameraX, -this.cameraY, this.WORLD_W, this.WORLD_H);
+            ctx.imageSmoothingEnabled = prev;
+        } else {
+            TileMap.renderMap(ctx, this.map, this.cameraX, this.cameraY, 1);
+        }
 
         // Render hotspots
         this.hotspots.forEach(hs => hs.render(ctx, this.cameraX, this.cameraY));
