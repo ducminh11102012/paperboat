@@ -54,74 +54,198 @@ const MapScreen = {
     // ease out cubic
     ease(x) { return 1 - Math.pow(1 - x, 3); },
 
+    // Numbered locations placed over the redrawn terrain (normalized 0..1).
+    SPOTS: [
+        { n: 1,  x: 0.065, y: 0.10, vi: 'Bến xe làng',  en: 'Bus stop' },
+        { n: 2,  x: 0.105, y: 0.27, vi: 'Cổng làng',    en: 'Village gate' },
+        { n: 3,  x: 0.335, y: 0.11, vi: 'Nhà bà nội',   en: "Grandma's house" },
+        { n: 4,  x: 0.355, y: 0.43, vi: 'Sân đình',     en: 'Temple yard' },
+        { n: 5,  x: 0.500, y: 0.34, vi: 'Đình làng',    en: 'Communal house' },
+        { n: 6,  x: 0.730, y: 0.27, vi: 'Cây đa',       en: 'Banyan tree' },
+        { n: 7,  x: 0.445, y: 0.62, vi: 'Giếng nước',   en: 'Old well' },
+        { n: 8,  x: 0.110, y: 0.58, vi: 'Nhà ông Tư',   en: "Mr Tu's house" },
+        { n: 9,  x: 0.585, y: 0.60, vi: 'Bãi thả diều', en: 'Kite field' },
+        { n: 10, x: 0.905, y: 0.66, vi: 'Cánh đồng',    en: 'Rice fields' },
+        { n: 11, x: 0.270, y: 0.84, vi: 'Bờ sông',      en: 'Riverbank' },
+        { n: 12, x: 0.530, y: 0.87, vi: 'Bãi tắm sông', en: 'River beach' },
+        { n: 13, x: 0.820, y: 0.85, vi: 'Nghĩa địa cũ', en: 'Old cemetery' },
+    ],
+
     render(ctx) {
         if (!this.active && this.t <= 0) return;
         this.update(Engine.dt);
         const W = Engine.W, H = Engine.H;
         const e = this.ease(this.t);
+        const vi = Engine.locale === 'vi';
 
-        // Dim + blur-ish backdrop over the frozen world
-        ctx.fillStyle = `rgba(8,7,12,${0.82 * e})`;
+        // Dim the frozen world behind the board
+        ctx.fillStyle = `rgba(7,6,11,${0.86 * e})`;
         ctx.fillRect(0, 0, W, H);
 
-        const img = (typeof Assets !== 'undefined') ? Assets.get('map_village') : null;
+        ctx.save();
+        ctx.globalAlpha = e;
+        // subtle pop-in
+        const s = 0.985 + 0.015 * e;
+        ctx.translate(W / 2, H / 2);
+        ctx.scale(s, s);
+        ctx.translate(-W / 2, -H / 2);
 
-        // Layout: leave a thin strip at the bottom for the close hint
-        const bottomStrip = 14;
-        const availH = H - bottomStrip - 6;
-        const topPad = 5;
+        // ---- Wooden board ----
+        const M = 4;
+        const bX = M, bY = M, bW = W - M * 2, bH = H - M * 2;
+        ctx.shadowColor = 'rgba(0,0,0,0.55)';
+        ctx.shadowBlur = 7; ctx.shadowOffsetY = 2;
+        ctx.fillStyle = '#241a12';
+        Engine.roundRect(ctx, bX, bY, bW, bH, 5); ctx.fill();
+        ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+        ctx.strokeStyle = 'rgba(214,178,95,0.75)'; ctx.lineWidth = 0.8;
+        Engine.roundRect(ctx, bX + 0.7, bY + 0.7, bW - 1.4, bH - 1.4, 5); ctx.stroke();
+        ctx.strokeStyle = 'rgba(214,178,95,0.18)'; ctx.lineWidth = 0.5;
+        Engine.roundRect(ctx, bX + 2.4, bY + 2.4, bW - 4.8, bH - 4.8, 4); ctx.stroke();
+
+        // ---- Left legend panel ----
+        const pX = bX + 3, pY = bY + 3, pW = 80, pH = bH - 6;
+        ctx.fillStyle = 'rgba(15,11,7,0.55)';
+        Engine.roundRect(ctx, pX, pY, pW, pH, 3); ctx.fill();
+        ctx.strokeStyle = 'rgba(214,178,95,0.22)'; ctx.lineWidth = 0.4;
+        Engine.roundRect(ctx, pX + 0.3, pY + 0.3, pW - 0.6, pH - 0.6, 3); ctx.stroke();
+
+        const cx = pX + pW / 2;
+        // Title
+        ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+        ctx.fillStyle = '#f3e3b6'; ctx.font = Engine.font(8.5, 800);
+        ctx.fillText('PAPER BOATS', cx, pY + 12);
+        // little boat glyph
+        this.boatGlyph(ctx, cx, pY + 16.5, 7, '#d6b25f');
+        ctx.fillStyle = '#e9dcc0'; ctx.font = Engine.font(6.5, 700);
+        ctx.fillText(vi ? 'BẢN ĐỒ LÀNG' : 'VILLAGE MAP', cx, pY + 25);
+        ctx.fillStyle = '#a89a7e'; ctx.font = Engine.font(4.6, 600);
+        ctx.fillText('HÀ NỘI · 1996', cx, pY + 31);
+
+        // divider
+        ctx.strokeStyle = 'rgba(214,178,95,0.3)'; ctx.lineWidth = 0.4;
+        ctx.beginPath(); ctx.moveTo(pX + 6, pY + 35.5); ctx.lineTo(pX + pW - 6, pY + 35.5); ctx.stroke();
+
+        // CHÚ THÍCH header
+        ctx.fillStyle = '#d6b25f'; ctx.font = Engine.font(5.2, 800);
+        ctx.fillText(vi ? 'CHÚ THÍCH' : 'LEGEND', cx, pY + 41.5);
+
+        // list 1..13
+        const listTop = pY + 47;
+        const step = (pH - (listTop - pY) - 4) / this.SPOTS.length;
+        ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+        for (let i = 0; i < this.SPOTS.length; i++) {
+            const sp = this.SPOTS[i];
+            const ry = listTop + step * i + step / 2;
+            // chip
+            const chW = 8.5, chH = 6.2, chX = pX + 5, chY = ry - chH / 2;
+            ctx.fillStyle = '#2f6fb0';
+            Engine.roundRect(ctx, chX, chY, chW, chH, 1.6); ctx.fill();
+            ctx.strokeStyle = 'rgba(255,230,168,0.5)'; ctx.lineWidth = 0.35;
+            Engine.roundRect(ctx, chX + 0.2, chY + 0.2, chW - 0.4, chH - 0.4, 1.4); ctx.stroke();
+            ctx.fillStyle = '#fff'; ctx.font = Engine.font(4.6, 800);
+            ctx.textAlign = 'center';
+            ctx.fillText(String(sp.n), chX + chW / 2, ry + 0.3);
+            // label
+            ctx.fillStyle = '#e3d8bf'; ctx.font = Engine.font(5, 600);
+            ctx.textAlign = 'left';
+            ctx.fillText(vi ? sp.vi : sp.en, chX + chW + 3, ry + 0.3);
+        }
+        ctx.textBaseline = 'alphabetic';
+
+        // ---- Map area (clean redrawn terrain + code badges) ----
+        const img = (typeof Assets !== 'undefined') ? Assets.get('map_village') : null;
+        const mX = pX + pW + 4, mY = bY + 4;
+        const mW = (bX + bW - 4) - mX, mH = bH - 8;
+
+        // map frame
+        ctx.fillStyle = '#1a130c';
+        Engine.roundRect(ctx, mX - 1.5, mY - 1.5, mW + 3, mH + 3, 3); ctx.fill();
 
         if (img) {
             const iw = img.naturalWidth, ih = img.naturalHeight;
-            const scale = Math.min((W - 10) / iw, availH / ih);
-            const dw = iw * scale * (0.96 + 0.04 * e);  // subtle pop-in
-            const dh = ih * scale * (0.96 + 0.04 * e);
-            const dx = (W - dw) / 2;
-            const dy = topPad + (availH - dh) / 2;
+            const scale = Math.min(mW / iw, mH / ih);
+            const dw = iw * scale, dh = ih * scale;
+            const dx = mX + (mW - dw) / 2, dy = mY + (mH - dh) / 2;
 
             ctx.save();
-            ctx.globalAlpha = e;
-            // soft drop shadow for a weighty, framed feel
-            ctx.shadowColor = 'rgba(0,0,0,0.6)';
-            ctx.shadowBlur = 8;
-            ctx.shadowOffsetY = 3;
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'high';
+            Engine.roundRect(ctx, dx, dy, dw, dh, 2.5); ctx.clip();
+            ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
             ctx.drawImage(img, dx, dy, dw, dh);
-            ctx.restore();
             ctx.imageSmoothingEnabled = false;
+            // gentle parchment warmth
+            ctx.fillStyle = 'rgba(60,40,15,0.10)';
+            ctx.fillRect(dx, dy, dw, dh);
+            ctx.restore();
+
+            ctx.strokeStyle = 'rgba(214,178,95,0.6)'; ctx.lineWidth = 0.6;
+            Engine.roundRect(ctx, dx, dy, dw, dh, 2.5); ctx.stroke();
+
+            // numbered badges
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            for (const sp of this.SPOTS) {
+                const px = dx + sp.x * dw, py = dy + sp.y * dh;
+                const r = 5.2;
+                // pin shadow
+                ctx.fillStyle = 'rgba(0,0,0,0.35)';
+                ctx.beginPath(); ctx.ellipse(px, py + r * 0.9, r * 0.7, r * 0.28, 0, 0, Math.PI * 2); ctx.fill();
+                // disc
+                ctx.fillStyle = '#2f6fb0';
+                ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = '#ffe6a8'; ctx.lineWidth = 0.8;
+                ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.stroke();
+                ctx.fillStyle = '#fff'; ctx.font = Engine.font(5.4, 800);
+                ctx.fillText(String(sp.n), px, py + 0.4);
+            }
+            ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
         } else {
-            // Fallback if the image hasn't loaded yet
             ctx.globalAlpha = e;
-            Engine.drawTextCentered(ctx, 'BẢN ĐỒ LÀNG', H / 2 - 4, '#e9dcc0', 14, 700);
-            Engine.drawTextCentered(ctx, 'Đang tải bản đồ…', H / 2 + 10, '#b8ad97', 8, 400);
-            ctx.globalAlpha = 1;
+            Engine.drawTextCentered(ctx, 'BẢN ĐỒ LÀNG', H / 2 - 4, '#e9dcc0', 12, 700);
+            Engine.drawTextCentered(ctx, vi ? 'Đang tải bản đồ…' : 'Loading map…', H / 2 + 10, '#b8ad97', 7, 400);
         }
 
-        // Close hint pill (bottom-center)
+        ctx.restore();
+
+        // ---- Close hint pill (bottom-center, over board) ----
         ctx.globalAlpha = e;
-        const vi = Engine.locale === 'vi';
         const txt = vi ? 'Đóng bản đồ' : 'Close map';
-        ctx.font = Engine.font(7.5, 600);
+        ctx.font = Engine.font(7, 700);
         const tw = ctx.measureText(txt).width;
-        const keyW = 22; // "M / ESC"
-        const bw = tw + keyW + 18;
-        const bx = (W - bw) / 2, by = H - bottomStrip - 1, bh = 13;
-        ctx.fillStyle = 'rgba(18,16,26,0.86)';
-        Engine.roundRect(ctx, bx, by, bw, bh, 5); ctx.fill();
-        ctx.strokeStyle = 'rgba(255,215,120,0.35)'; ctx.lineWidth = 0.5;
-        Engine.roundRect(ctx, bx + 0.3, by + 0.3, bw - 0.6, bh - 0.6, 5); ctx.stroke();
-        // key caps
+        const keyW = 22;
+        const bw2 = tw + keyW + 16;
+        const bx2 = (W - bw2) / 2, by2 = H - 13, bh2 = 11;
+        ctx.fillStyle = 'rgba(18,14,9,0.92)';
+        Engine.roundRect(ctx, bx2, by2, bw2, bh2, 4.5); ctx.fill();
+        ctx.strokeStyle = 'rgba(214,178,95,0.4)'; ctx.lineWidth = 0.5;
+        Engine.roundRect(ctx, bx2 + 0.3, by2 + 0.3, bw2 - 0.6, bh2 - 0.6, 4.5); ctx.stroke();
         ctx.fillStyle = '#ffe6a8';
-        Engine.roundRect(ctx, bx + 5, by + 3, keyW - 2, bh - 6, 2.2); ctx.fill();
-        ctx.fillStyle = '#3a2a08'; ctx.font = Engine.font(6, 700);
+        Engine.roundRect(ctx, bx2 + 4, by2 + 2.6, keyW - 2, bh2 - 5.2, 2); ctx.fill();
+        ctx.fillStyle = '#3a2a08'; ctx.font = Engine.font(5.6, 800);
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText('M / ESC', bx + 5 + (keyW - 2) / 2, by + bh / 2 + 0.5);
-        ctx.fillStyle = '#f0e6d2'; ctx.font = Engine.font(7.5, 600);
+        ctx.fillText('M / ESC', bx2 + 4 + (keyW - 2) / 2, by2 + bh2 / 2 + 0.3);
+        ctx.fillStyle = '#f0e6d2'; ctx.font = Engine.font(7, 700);
         ctx.textAlign = 'left';
-        ctx.fillText(txt, bx + keyW + 9, by + bh / 2 + 0.5);
+        ctx.fillText(txt, bx2 + keyW + 8, by2 + bh2 / 2 + 0.3);
         ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
         ctx.globalAlpha = 1;
+    },
+
+    // tiny paper-boat glyph
+    boatGlyph(ctx, cx, cy, w, color) {
+        ctx.save();
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(cx - w / 2, cy);
+        ctx.lineTo(cx + w / 2, cy);
+        ctx.lineTo(cx + w / 3.2, cy + w / 3.2);
+        ctx.lineTo(cx - w / 3.2, cy + w / 3.2);
+        ctx.closePath(); ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - w / 2.6);
+        ctx.lineTo(cx + w / 2.4, cy - 0.4);
+        ctx.lineTo(cx, cy - 0.4);
+        ctx.closePath(); ctx.fill();
+        ctx.restore();
     },
 
     // Small persistent "M Bản đồ" hint drawn on gameplay scenes (discoverability)
