@@ -294,7 +294,11 @@ const Chapter2Scene = {
         this.phase = 'scene_silence';
         Dialogue.startRaw(Engine.getDialogue('ch2_silence'), () => {
             Engine.setFlag('ch2_complete');
-            Engine.fadeToScene(Chapter3Scene);
+            // Minh's Nhãn Âm awakens after Thu's reveal → first other spirit (the
+            // ferryman case) before the investigation chapter. Always shippable:
+            // the ferryman scene fades on to Chapter 3 when finished.
+            if (typeof NightVision !== 'undefined') NightVision.unlock();
+            Engine.fadeToScene(typeof FerrymanCaseScene !== 'undefined' ? FerrymanCaseScene : Chapter3Scene);
         });
     },
 
