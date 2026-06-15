@@ -88,6 +88,8 @@ const Chapter3Scene = {
                 if (this.timer > 2.5 || Engine.anyInteract()) {
                     this.phase = 'explore';
                     this.timer = 0;
+                    Engine.setObjective('Tìm manh mối quanh làng — mở Sổ Tay (N)', 'Find clues around the village — open the Notebook (N)');
+                    if (typeof Hud !== 'undefined' && Hud.showAreaToast) Hud.showAreaToast('Có gì đó không ổn…', 'Something feels wrong…');
                 }
                 break;
 
@@ -102,6 +104,9 @@ const Chapter3Scene = {
 
                 if (!Dialogue.active) {
                     this.checkInteractions();
+                }
+                if (this.foundGrave && this.foundNotebook && !this.metOngTu) {
+                    Engine.setObjective('Ra bờ sông hỏi ông Tư', 'Ask Old Tu down by the river', { x: 20 * 16, y: 12 * 16 });
                 }
                 break;
 
@@ -125,6 +130,7 @@ const Chapter3Scene = {
                 if (Engine.justPressed('Space') || Engine.justPressed('KeyZ')) {
                     this.foundGrave = true;
                     Engine.keepMemory('mem_grave');
+                    if (typeof Notebook !== 'undefined') Notebook.addClue('grave');
                     this.phase = 'dialogue';
                     Player.lock();
                     Dialogue.startRaw(Engine.getDialogue('ch3_grave'), () => {
@@ -141,6 +147,7 @@ const Chapter3Scene = {
             if (noteHS.containsPoint(Player.x, Player.y)) {
                 if (Engine.justPressed('Space') || Engine.justPressed('KeyZ')) {
                     this.foundNotebook = true;
+                    if (typeof Notebook !== 'undefined') Notebook.addClue('death_record');
                     this.phase = 'dialogue';
                     Player.lock();
                     Dialogue.startRaw(Engine.getDialogue('ch3_notebook'), () => {
@@ -151,10 +158,22 @@ const Chapter3Scene = {
             }
         }
 
-        // Ông Tư interaction
+        // Ông Tư interaction — gated: he only opens up once you've found the
+        // grave AND the memorial record (master doc: 3 main leads gate Hồi III→IV).
         if (!this.metOngTu && this.ongTuNPC.distTo(Player.x, Player.y) < 24) {
             if (Engine.justPressed('Space') || Engine.justPressed('KeyZ')) {
+                if (!this.foundGrave || !this.foundNotebook) {
+                    this.phase = 'dialogue';
+                    Player.lock();
+                    const vi = Engine.locale === 'vi';
+                    Dialogue.startRaw([{ speaker: vi ? 'Ông Tư' : 'Old Tu',
+                        text: vi ? 'Bạn cháu hử… Cháu đi quanh làng xem đã. Cái mộ sau bụi tre, với cuốn sổ cũ trong nhà bà cháu — xem rồi quay lại đây.'
+                                 : "Your friend, hm… Look around the village first. The grave behind the bamboo, and your grandma's old notebook — see those, then come back.",
+                        portrait: 'ong_tu' }], () => { Player.unlock(); this.phase = 'explore'; });
+                    return;
+                }
                 this.metOngTu = true;
+                if (typeof Notebook !== 'undefined') { Notebook.meetPerson('ong_tu'); Notebook.addClue('ongtu_pulled'); }
                 this.phase = 'dialogue';
                 Player.lock();
                 Audio.stopMusic();
