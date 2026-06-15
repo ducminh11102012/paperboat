@@ -29,6 +29,11 @@ const Notebook = {
         grave:          { vi: "Mộ sau bụi tre: NGUYỄN THỊ THU · 1984–1994. Mới mười tuổi.", en: "Grave behind the bamboo: NGUYEN THI THU · 1984\u20131994. Only ten.", main: true },
         death_record:   { vi: "Sổ cúng của bà: Thu mất tháng 8/1994, mùa nước lớn — cúng cùng các cháu khác.", en: "Grandma's memorial book: Thu died Aug 1994, the great flood — honored with the other children.", main: true },
         ongtu_pulled:   { vi: "Ông Tư là người kéo Thu lên ở khúc dưới, mùa lũ 1994.", en: "Old Tu is the one who pulled Thu from the water downstream, flood of 1994.", main: true },
+        // --- Vụ: Ông lái đò (Upgrade v4) ---
+        lai_do_oar:      { vi: "Mái chèo cũ bên bến — nhẵn thín vì bao đêm chèo không nghỉ.", en: "An old oar by the dock — worn smooth from countless tireless nights." },
+        lai_do_tally:    { vi: "Cọc khắc đếm khách qua đò, vạch cuối dừng ở mùa lũ 1994.", en: "A post notched per passenger, the last notch stopping at the flood of 1994." },
+        lai_do_offering: { vi: "Mâm cúng héo bên bờ — lâu rồi không ai thay cho ông lái đò.", en: "A wilted offering at the bank — long untended for the ferryman." },
+        lai_do_echo:     { vi: "Ông lái đò cũng chờ một người không về — như bà chờ Thu.", en: "The ferryman, too, waits for one who never returns — as Grandma waits for Thu." },
     },
     PEOPLE_DEFS: {
         thu:    { name: "Thu",     portrait: "thu_normal",  vi: "Con bé áo hoa ở bờ ao. Cộc, hay nói dối vặt, thuộc cái ao như lòng bàn tay.", en: "The girl in the floral shirt by the pond. Blunt, fibs a lot, knows the pond by heart." },
@@ -79,14 +84,14 @@ const Notebook = {
     handleInput() {
         if (this.active) {
             if (Engine.justPressed('KeyN') || Engine.justPressed('Escape')) this.close();
-            if (Engine.justPressed('ArrowLeft') || Engine.justPressed('KeyA')) this.tab = 0;
-            if (Engine.justPressed('ArrowRight') || Engine.justPressed('KeyD')) this.tab = 1;
-            if (Engine.justPressed('Tab')) this.tab = this.tab === 0 ? 1 : 0;
+            if (Engine.justPressed('ArrowLeft') || Engine.justPressed('KeyA')) this.tab = (this.tab + 2) % 3;
+            if (Engine.justPressed('ArrowRight') || Engine.justPressed('KeyD')) this.tab = (this.tab + 1) % 3;
+            if (Engine.justPressed('Tab')) this.tab = (this.tab + 1) % 3;
             // tab clicks
             if (Engine.mouseClicked) {
                 const W = Engine.W;
                 if (Engine.mouseY > 22 && Engine.mouseY < 34) {
-                    this.tab = Engine.mouseX < W / 2 ? 0 : 1;
+                    this.tab = Math.min(2, Math.floor(Engine.mouseX / (W / 3)));
                 }
             }
             Engine.keysJustPressed = {};
@@ -146,27 +151,30 @@ const Notebook = {
 
         // ---- Tabs ----
         const tabY = 23, tabH = 11;
+        const caseN = (typeof SpiritCases !== 'undefined') ? SpiritCases.total() : 0;
         const tabs = [
             { vi: 'MANH MỐI', en: 'CLUES', n: this.clues.length },
-            { vi: 'NGƯỜI TRONG LÀNG', en: 'PEOPLE', n: this.people.length },
+            { vi: 'NGƯỜI', en: 'PEOPLE', n: this.people.length },
+            { vi: 'VỤ', en: 'CASES', n: caseN },
         ];
-        const halfW = (bW - 14) / 2;
-        for (let i = 0; i < 2; i++) {
-            const tx = bX + 7 + i * halfW, tw = halfW;
+        const thirdW = (bW - 14) / 3;
+        for (let i = 0; i < 3; i++) {
+            const tx = bX + 7 + i * thirdW, tw = thirdW;
             const sel = this.tab === i;
             ctx.fillStyle = sel ? 'rgba(255,210,90,0.16)' : 'rgba(0,0,0,0.18)';
             Engine.roundRect(ctx, tx + 1, tabY, tw - 2, tabH, 3); ctx.fill();
             if (sel) { ctx.strokeStyle = 'rgba(255,210,90,0.6)'; ctx.lineWidth = 0.5; Engine.roundRect(ctx, tx + 1, tabY, tw - 2, tabH, 3); ctx.stroke(); }
             ctx.fillStyle = sel ? '#ffe9bd' : '#9b917e';
-            ctx.font = Engine.font(6, 800); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillText((vi ? tabs[i].vi : tabs[i].en) + '  (' + tabs[i].n + ')', tx + tw / 2, tabY + tabH / 2 + 0.3);
+            ctx.font = Engine.font(5.6, 800); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText((vi ? tabs[i].vi : tabs[i].en) + ' (' + tabs[i].n + ')', tx + tw / 2, tabY + tabH / 2 + 0.3);
         }
         ctx.textBaseline = 'alphabetic';
 
         // ---- Content area ----
         const cX = bX + 11, cY = tabY + tabH + 5, cW = bW - 22;
         if (this.tab === 0) this.renderClues(ctx, cX, cY, cW, vi);
-        else this.renderPeople(ctx, cX, cY, cW, vi);
+        else if (this.tab === 1) this.renderPeople(ctx, cX, cY, cW, vi);
+        else this.renderCases(ctx, cX, cY, cW, vi);
 
         ctx.restore();
 
@@ -229,6 +237,42 @@ const Notebook = {
             ctx.fillText(def.name, x + ps + 5, cy + 7);
             Engine.drawText(ctx, vi ? def.vi : def.en, x + ps + 5, cy + 15, w - ps - 7, '#d8cdb6', 6.4, 8, 400);
             cy += ps + 5;
+        }
+    },
+
+    renderCases(ctx, x, y, w, vi) {
+        // ---- The 1994 flood mystery (case-board) ----
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#ff9a6a'; ctx.font = Engine.font(7, 800);
+        ctx.fillText(vi ? '✦ Bí ẩn trận lũ 1994' : '\u2726 The flood of 1994', x, y + 4);
+        let cy = y + 9;
+        const layer = (typeof MysteryTracker !== 'undefined') ? MysteryTracker.layer : 0;
+        if (layer === 0) {
+            cy = Engine.drawText(ctx, vi ? 'Tiễn những hồn còn vương vấn — mỗi vụ hé lộ một lớp sự thật.'
+                                         : 'Lay the lingering souls to rest — each case reveals a layer of the truth.', x, cy + 4, w, '#8a8170', 6.4, 8, 400);
+        } else {
+            for (let i = 1; i <= layer; i++) {
+                ctx.fillStyle = '#c98a6a'; ctx.beginPath(); ctx.arc(x + 2, cy + 3, 1.4, 0, Math.PI * 2); ctx.fill();
+                cy = Engine.drawText(ctx, MysteryTracker.layerText(i), x + 8, cy + 5, w - 10, '#e8b89a', 6.2, 8, 400) + 1.5;
+            }
+        }
+        cy += 4;
+        // ---- Spirit cases roster ----
+        ctx.fillStyle = '#9fc4ff'; ctx.font = Engine.font(7, 800); ctx.textAlign = 'left';
+        const done = (typeof SpiritCases !== 'undefined') ? SpiritCases.count() : 0;
+        const tot = (typeof SpiritCases !== 'undefined') ? SpiritCases.total() : 0;
+        ctx.fillText((vi ? 'Hồn đã tiễn' : 'Souls laid to rest') + '  ' + done + ' / ' + tot, x, cy + 4);
+        cy += 9;
+        const defs = (typeof SpiritCases !== 'undefined') ? SpiritCases.DEFS : {};
+        for (const id in defs) {
+            const d = defs[id];
+            const resolved = (typeof SpiritCases !== 'undefined') && SpiritCases.isResolved(id);
+            ctx.fillStyle = resolved ? '#7fae7a' : '#6f9bd0';
+            ctx.beginPath(); ctx.arc(x + 2, cy + 3, 1.6, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = resolved ? '#bfe0bc' : '#cfe0ff'; ctx.font = Engine.font(6.8, 800); ctx.textAlign = 'left';
+            ctx.fillText((vi ? d.name.vi : d.name.en) + (resolved ? (vi ? ' — đã tiễn' : ' — at rest') : ''), x + 8, cy + 5);
+            cy += 8;
+            cy = Engine.drawText(ctx, vi ? d.bond.vi : d.bond.en, x + 8, cy + 1, w - 10, '#a9b6c8', 6, 7.6, 400) + 3;
         }
     },
 
