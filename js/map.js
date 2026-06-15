@@ -12,6 +12,7 @@ const MapScreen = {
         if (!s || s.showHud === false) return false;
         if (typeof Dialogue !== 'undefined' && Dialogue.active) return false;
         if (typeof Hud !== 'undefined' && Hud.tutorial) return false;
+        if (typeof Notebook !== 'undefined' && Notebook.active) return false;
         return true;
     },
 
