@@ -463,9 +463,42 @@ class NPC {
         this.visible = true; this.alpha = isGhost ? 0.9 : 1;
         this.animFrame = 0; this.animTimer = 0; this.flickerTimer = 0;
         this.bob = Math.random() * 6;
+        // --- cutscene actor movement / acting ---
+        this.tx = x; this.ty = y;        // walk target
+        this.moveSpeed = 34;
+        this.walking = false;
+        this.hopT = 0;                    // >0 while doing a little hop (joy)
+        this.shakeT = 0;                  // >0 while trembling (fear/cold)
+        this.gestureCb = null;
     }
+    // Tell the actor to walk to a world point; face it on arrival.
+    walkTo(x, y, faceDir = null) { this.tx = x; this.ty = y; this._faceOnArrive = faceDir; }
+    face(dir) { this.dir = dir; }
+    hop() { this.hopT = 0.42; }          // a small happy jump
+    tremble(d = 0.6) { this.shakeT = d; }
+    atTarget() { return Math.hypot(this.tx - this.x, this.ty - this.y) < 1.5; }
+
     update(dt) {
         this.bob += dt;
+        if (this.hopT > 0) this.hopT = Math.max(0, this.hopT - dt);
+        if (this.shakeT > 0) this.shakeT = Math.max(0, this.shakeT - dt);
+
+        // walk toward target
+        const dx = this.tx - this.x, dy = this.ty - this.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist > 1.2) {
+            const step = Math.min(dist, this.moveSpeed * dt);
+            this.x += (dx / dist) * step;
+            this.y += (dy / dist) * step;
+            this.dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+            this.walking = true;
+            this.animTimer += dt;
+            if (this.animTimer >= 0.14) { this.animTimer = 0; this.animFrame = (this.animFrame + 1) % 4; }
+        } else {
+            if (this.walking && this._faceOnArrive) { this.dir = this._faceOnArrive; this._faceOnArrive = null; }
+            this.walking = false; this.animFrame = 0;
+        }
+
         if (this.isGhost) {
             this.flickerTimer += dt;
             if (this.flickerTimer > 3 + Math.random() * 2) {
@@ -477,14 +510,18 @@ class NPC {
     }
     render(ctx, cameraX, cameraY) {
         if (!this.visible) return;
-        const frame = Sprites.getFrame(this.spriteName, `idle_${this.dir}`, 0);
+        const animName = this.walking ? `walk_${this.dir}` : `idle_${this.dir}`;
+        const frame = Sprites.getFrame(this.spriteName, animName, this.animFrame) ||
+                      Sprites.getFrame(this.spriteName, `idle_${this.dir}`, 0);
         if (!frame) return;
-        const sx = Math.floor(this.x - cameraX), sy = Math.floor(this.y - cameraY);
+        let sx = Math.floor(this.x - cameraX), sy = Math.floor(this.y - cameraY);
+        if (this.shakeT > 0) sx += Math.round(Math.sin(Engine.frameCount * 0.9) * 1.2);
         // soft shadow
         ctx.fillStyle = 'rgba(0,0,0,0.22)';
         ctx.beginPath(); ctx.ellipse(sx, sy - 1, 6, 2.4, 0, 0, 7); ctx.fill();
         ctx.globalAlpha = this.alpha;
-        const fy = this.isGhost ? Math.sin(this.bob * 1.5) * 1 : 0;
+        let fy = this.isGhost ? Math.sin(this.bob * 1.5) * 1 : 0;
+        if (this.hopT > 0) fy -= Math.sin((1 - this.hopT / 0.42) * Math.PI) * 5; // arc of the hop
         ctx.drawImage(frame, sx - 8, Math.floor(sy - 20 + fy));
         ctx.globalAlpha = 1;
     }

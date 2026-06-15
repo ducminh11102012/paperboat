@@ -242,6 +242,16 @@ const Sprites = {
             eyes: '#1a1a2e',
         });
 
+        // Bắp (the living boy who can't see Thu)
+        this.createCharacter('bap', {
+            skin: '#e0bd92',
+            hair: '#23201c',
+            shirt: '#cf6a48',
+            pants: '#3c4a38',
+            shoes: '#4a3a26',
+            eyes: '#1a1a2e',
+        });
+
         // Ông lái đò (ghost — spirit case)
         this.createCharacter('lai_do', {
             skin: '#aebccb',
