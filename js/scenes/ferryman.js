@@ -132,6 +132,7 @@ const FerrymanCaseScene = {
                 break;
             }
 
+            case 'intro':
             case 'dialogue':
                 Dialogue.update(dt);
                 this.npcs.forEach(n => n.update(dt));
