@@ -22,8 +22,9 @@ const Assets = {
         'bg_sky_dusk': 'assets/art/bg_sky_dusk_sm.png',
         'bg_night_river': 'assets/art/bg_night_river_sm.png',
         'bg_letter': 'assets/art/bg_letter_sm.png',
-        // Village map screen (press M) — hand-painted overview
-        'map_village': 'assets/art/village_map.webp',
+        // Village map screen (press M) now reuses the clean redrawn terrain;
+        // the frame/legend/number badges are drawn in code on the crisp UI layer.
+        'map_village': 'assets/art/village_ground.webp',
         // Painted village terrain used as the Chapter 1 gameplay ground
         'village_ground': 'assets/art/village_ground.webp',
     },
