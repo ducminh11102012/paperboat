@@ -72,7 +72,26 @@ const TitleScene = {
     },
 
     render(ctx) {
-        // Night sky gradient
+        const bgArt = (typeof Assets !== 'undefined') ? Assets.get('bg_title') : null;
+        if (bgArt) {
+            // High-quality painted background
+            ctx.imageSmoothingEnabled = true;
+            ctx.drawImage(bgArt, 0, 0, Engine.W, Engine.H);
+            ctx.imageSmoothingEnabled = false;
+            // Subtle twinkling stars on top
+            this.stars.forEach(s => {
+                if (s.y < Engine.H * 0.45) {
+                    ctx.fillStyle = `rgba(255, 255, 230, ${s.brightness * 0.5 * this.titleAlpha})`;
+                    ctx.fillRect(Math.floor(s.x), Math.floor(s.y), 1, 1);
+                }
+            });
+            // Darken slightly for text legibility
+            ctx.fillStyle = 'rgba(8, 8, 24, 0.15)';
+            ctx.fillRect(0, 0, Engine.W, Engine.H);
+            ctx.fillStyle = 'rgba(8, 8, 24, 0.35)';
+            ctx.fillRect(0, 20, Engine.W, 48);
+        } else {
+        // Night sky gradient (procedural fallback)
         const grad = ctx.createLinearGradient(0, 0, 0, Engine.H);
         grad.addColorStop(0, '#0a0a20');
         grad.addColorStop(0.4, '#1a1a3a');
@@ -120,10 +139,7 @@ const TitleScene = {
         ctx.lineTo(boatX + 13, boatBaseY + 3);
         ctx.closePath();
         ctx.fill();
-
-        // Moon reflection
-        ctx.fillStyle = 'rgba(200, 200, 180, 0.1)';
-        ctx.fillRect(Engine.W / 2 - 12, waterY + 8, 24, 20);
+        }
 
         // Title
         ctx.globalAlpha = this.titleAlpha;

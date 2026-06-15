@@ -188,11 +188,24 @@ const Dialogue = {
         ctx.lineWidth = 1;
         ctx.strokeRect(4.5, boxY + 0.5, Engine.W - 9, boxH - 1);
 
-        // Portrait
+        // Portrait — prefer high-quality loaded art, fall back to procedural
         if (hasPortrait) {
-            const prt = Sprites.getPortrait(this.portrait);
-            if (prt) {
-                ctx.drawImage(prt, 8, boxY + 4, portraitSize, portraitSize);
+            const artPrt = (typeof Assets !== 'undefined') ? Assets.getPortrait(this.portrait) : null;
+            if (artPrt) {
+                // Frame the portrait
+                ctx.fillStyle = '#1a1410';
+                ctx.fillRect(7, boxY + 3, portraitSize + 2, portraitSize + 2);
+                ctx.imageSmoothingEnabled = true;
+                ctx.drawImage(artPrt, 8, boxY + 4, portraitSize, portraitSize);
+                ctx.imageSmoothingEnabled = false;
+                ctx.strokeStyle = '#d4c9a8';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(7.5, boxY + 3.5, portraitSize + 1, portraitSize + 1);
+            } else {
+                const prt = Sprites.getPortrait(this.portrait);
+                if (prt) {
+                    ctx.drawImage(prt, 8, boxY + 4, portraitSize, portraitSize);
+                }
             }
         }
 

@@ -151,7 +151,16 @@ const Chapter4BScene = {
     },
 
     renderFestival(ctx) {
-        // Night sky
+        const bgArt = (typeof Assets !== 'undefined') ? Assets.get('bg_festival') : null;
+        if (bgArt) {
+            ctx.imageSmoothingEnabled = true;
+            ctx.drawImage(bgArt, 0, 0, Engine.W, Engine.H);
+            ctx.imageSmoothingEnabled = false;
+            // Gentle night tint over the painting
+            ctx.fillStyle = 'rgba(10, 8, 24, 0.12)';
+            ctx.fillRect(0, 0, Engine.W, Engine.H);
+        } else {
+        // Night sky (procedural fallback)
         const grad = ctx.createLinearGradient(0, 0, 0, Engine.H);
         grad.addColorStop(0, '#0a0818');
         grad.addColorStop(0.3, '#1a1030');
@@ -191,6 +200,7 @@ const Chapter4BScene = {
         ctx.fillRect(20, Engine.H * 0.25, Engine.W - 40, 12);
         ctx.fillStyle = '#4a2020';
         ctx.fillRect(30, Engine.H * 0.22, Engine.W - 60, 6);
+        }
 
         // Lanterns
         for (const l of this.lanterns) {
