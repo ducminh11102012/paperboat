@@ -573,10 +573,10 @@ const Chapter1Scene = {
         }
 
         if (this.hideMsgT > 0 && this.hideMsg) {
-            Engine.drawTextCentered(ctx, this.hideMsg, H * 0.74, '#3a2a14', 7, 700);
+            Engine.drawTextCentered(ctx, this.hideMsg, H * 0.82, '#3a2a14', 7, 700);
         }
         if (this.hideFound) {
-            Engine.drawTextCentered(ctx, vi ? 'Tìm thấy rồi!' : 'Found her!', H * 0.74, '#235a23', 9, 800);
+            Engine.drawTextCentered(ctx, vi ? 'Tìm thấy rồi!' : 'Found her!', H * 0.82, '#235a23', 9, 800);
         } else {
             Engine.drawTextCentered(ctx, vi ? '← → chọn chỗ nấp · SPACE để tìm' : '← → pick a spot · SPACE to seek', H - 12, '#3a2a14', 7, 600);
         }
