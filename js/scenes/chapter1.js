@@ -214,6 +214,16 @@ const Chapter1Scene = {
             case 'unease':
                 Dialogue.update(dt);
                 break;
+
+            case 'minigame_fish':
+                if (Dialogue.active) { Dialogue.update(dt); break; }
+                this.updateFishGame(dt);
+                break;
+
+            case 'minigame_hide':
+                if (Dialogue.active) { Dialogue.update(dt); break; }
+                this.updateHideGame(dt);
+                break;
         }
 
         // Update NPCs
@@ -337,11 +347,8 @@ const Chapter1Scene = {
                     Dialogue.startRaw(Engine.getDialogue(nextKey), () => {
                         this.phase = 'after_choice';
                         Dialogue.startRaw(Engine.getDialogue('ch1_after_choice'), () => {
-                            // Seed #1 trigger
-                            this._seed1Done = true;
-                            Dialogue.startRaw(Engine.getDialogue('ch1_seed1'), () => {
-                                this.startUnease();
-                            });
+                            // A whole summer afternoon of PLAYING with Thu before the unease
+                            this.startPlaySequence();
                         });
                     });
                 });
@@ -364,7 +371,220 @@ const Chapter1Scene = {
         });
     },
 
+    // ===== PLAY SEQUENCE: a summer afternoon of doing things with Thu =====
+    startPlaySequence() {
+        const vi = Engine.locale === 'vi';
+        Dialogue.startRaw([
+            { speaker: 'Thu', text: vi ? 'Đứng đực ra đấy làm gì. Xuống đây, tao chỉ mày bắt cá rô.' : "Why just stand there. Get down here, I'll show you how to catch a fish.", portrait: 'thu_normal' },
+            { speaker: 'Minh', text: vi ? 'Tao có biết bắt đâu…' : "I don't know how…", portrait: 'minh' },
+            { speaker: 'Thu', text: vi ? 'Thì học. Thấy nó nổi vào vạch xanh thì chộp. Nhanh tay lên.' : "So learn. When it floats into the green band, grab it. Be quick.", portrait: 'thu_normal' },
+        ], () => { this.startFishGame(); });
+    },
+
+    // ---- Mini-game 1: bắt cá rô (timing) -------------------------------
+    startFishGame() {
+        this.phase = 'minigame_fish';
+        this.fishCaught = 0;
+        this.fishTarget = 3;
+        this.fishPos = 10;
+        this.fishDir = 1;
+        this.fishSpeed = 95;
+        this.fishZoneX = 40 + Math.random() * 180;
+        this.fishZoneW = 46;
+        this.fishFlash = 0;      // >0 green success flash, <0 red miss flash
+        this.fishMsgT = 0;
+    },
+
+    updateFishGame(dt) {
+        // moving bobber bounces across the bar (x in 0..280 within a centered bar)
+        this.fishPos += this.fishDir * this.fishSpeed * dt;
+        if (this.fishPos > 280) { this.fishPos = 280; this.fishDir = -1; }
+        if (this.fishPos < 0) { this.fishPos = 0; this.fishDir = 1; }
+        if (this.fishFlash !== 0) this.fishFlash -= Math.sign(this.fishFlash) * dt;
+        if (Math.abs(this.fishFlash) < 0.02) this.fishFlash = 0;
+
+        const pressed = Engine.justPressed('Space') || Engine.justPressed('KeyZ') || Engine.justPressed('Enter') || Engine.mouseClicked;
+        if (pressed) {
+            const inZone = this.fishPos >= this.fishZoneX && this.fishPos <= this.fishZoneX + this.fishZoneW;
+            if (inZone) {
+                this.fishCaught++;
+                this.fishFlash = 0.35;
+                if (typeof Audio !== 'undefined') { Audio.playSFX('firefly_catch'); }
+                if (this.fishCaught >= this.fishTarget) { this.finishFishGame(); return; }
+                // new zone + speed up a touch
+                this.fishZoneX = 30 + Math.random() * 200;
+                this.fishZoneW = Math.max(34, 46 - this.fishCaught * 5);
+                this.fishSpeed += 22;
+            } else {
+                this.fishFlash = -0.3;
+                if (typeof Audio !== 'undefined') { Audio.playSFX('water'); }
+            }
+        }
+    },
+
+    finishFishGame() {
+        const vi = Engine.locale === 'vi';
+        if (typeof Engine.keepMemory === 'function') Engine.keepMemory('mem_fish');
+        Dialogue.startRaw([
+            { speaker: 'Thu', text: vi ? 'Đấy. Có khó gì đâu. Mày học nhanh phết.' : "There. Not hard at all. You learn fast.", portrait: 'thu_real_smile' },
+            { speaker: 'Thu', text: vi ? 'Thả nó lại đi. Tao chỉ thích bắt, không thích giữ.' : "Put it back. I like catching, not keeping.", portrait: 'thu_normal' },
+            { speaker: 'Minh', text: vi ? 'Mày kỳ thật đấy.' : "You're a weird one.", portrait: 'minh' },
+        ], () => { this.startHidePrompt(); });
+    },
+
+    // ---- Mini-game 2: trốn tìm (seek) ----------------------------------
+    startHidePrompt() {
+        const vi = Engine.locale === 'vi';
+        Dialogue.startRaw([
+            { speaker: 'Thu', text: vi ? 'Giờ trốn tìm. Mày nhắm mắt đếm tới mười, tao trốn.' : "Now hide-and-seek. Close your eyes, count to ten. I'll hide.", portrait: 'thu_normal' },
+            { speaker: 'Minh', text: vi ? '…tám, chín, mười. Tao tìm đây!' : "…eight, nine, ten. Ready or not!", portrait: 'minh' },
+        ], () => { this.startHideGame(); });
+    },
+
+    startHideGame() {
+        this.phase = 'minigame_hide';
+        // 4 hiding spots; Thu is in a random one
+        this.hideSpots = [
+            { vi: 'Bụi chuối', en: 'Banana grove' },
+            { vi: 'Sau cây đa', en: 'Behind the banyan' },
+            { vi: 'Đống rơm', en: 'Haystack' },
+            { vi: 'Bờ giếng', en: 'By the well' },
+        ];
+        this.hideThuSpot = Math.floor(Math.random() * this.hideSpots.length);
+        this.hideCursor = 0;
+        this.hideTries = 0;
+        this.hideFound = false;
+        this.hideMsg = null;
+        this.hideMsgT = 0;
+        this.hideRevealT = 0;
+    },
+
+    updateHideGame(dt) {
+        if (this.hideMsgT > 0) this.hideMsgT -= dt;
+        if (this.hideFound) {
+            this.hideRevealT += dt;
+            if (this.hideRevealT > 1.8 || Engine.anyInteract()) this.finishHideGame();
+            return;
+        }
+        const n = this.hideSpots.length;
+        if (Engine.justPressed('ArrowLeft') || Engine.justPressed('KeyA')) this.hideCursor = (this.hideCursor - 1 + n) % n;
+        if (Engine.justPressed('ArrowRight') || Engine.justPressed('KeyD')) this.hideCursor = (this.hideCursor + 1) % n;
+        // mouse hover-select
+        if (typeof Engine.mouseX === 'number') {
+            const cw = Engine.W / n;
+            const mi = Math.floor(Engine.mouseX / cw);
+            if (mi >= 0 && mi < n && Engine.mouseClicked) this.hideCursor = mi;
+        }
+        const pressed = Engine.justPressed('Space') || Engine.justPressed('KeyZ') || Engine.justPressed('Enter') || Engine.mouseClicked;
+        if (pressed) {
+            const vi = Engine.locale === 'vi';
+            if (this.hideCursor === this.hideThuSpot) {
+                this.hideFound = true; this.hideRevealT = 0;
+                if (typeof Audio !== 'undefined') Audio.playSFX('firefly_catch');
+            } else {
+                this.hideTries++;
+                if (typeof Audio !== 'undefined') Audio.playSFX('page_turn');
+                // a little teasing hint toward Thu's spot
+                const near = Math.abs(this.hideCursor - this.hideThuSpot) <= 1;
+                this.hideMsg = near ? (vi ? 'Hình như có tiếng cười khúc khích gần đây…' : 'A muffled giggle somewhere close…')
+                                    : (vi ? 'Trống không. Tiếng cười vọng từ chỗ khác.' : 'Empty. The laugh echoes from elsewhere.');
+                this.hideMsgT = 1.6;
+            }
+        }
+    },
+
+    finishHideGame() {
+        const vi = Engine.locale === 'vi';
+        if (typeof Engine.keepMemory === 'function') Engine.keepMemory('mem_hide');
+        Dialogue.startRaw([
+            { speaker: 'Thu', text: vi ? 'Hí hí! Mày tìm lâu thế. Tao trốn ở đây cả trăm lần rồi.' : "Hee! Took you ages. I've hidden here a hundred times.", portrait: 'thu_real_smile' },
+            { speaker: 'Minh', text: vi ? 'Cả trăm lần? Mày chơi với ai?' : "A hundred times? With who?", portrait: 'minh' },
+            { speaker: 'Thu', text: vi ? '…Tự chơi. Ở đây tao thuộc hết mọi chỗ nấp.' : "…By myself. I know every hiding spot here.", portrait: 'thu_normal' },
+        ], () => {
+            // back to the original seed/unease beats
+            this._seed1Done = true;
+            Dialogue.startRaw(Engine.getDialogue('ch1_seed1'), () => { this.startUnease(); });
+        });
+    },
+
+    renderFishGame(ctx) {
+        const W = Engine.W, H = Engine.H, vi = Engine.locale === 'vi';
+        // pond afternoon
+        const g = ctx.createLinearGradient(0, 0, 0, H);
+        g.addColorStop(0, '#8fb8c8'); g.addColorStop(0.5, '#6f9bb0'); g.addColorStop(1, '#3f6f6a');
+        ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = 'rgba(40,90,90,0.5)'; ctx.fillRect(0, H * 0.55, W, H * 0.45);
+        // ripples
+        for (let i = 0; i < 5; i++) {
+            const ry = H * 0.6 + i * 8 + Math.sin(Engine.frameCount * 0.04 + i) * 1.5;
+            ctx.strokeStyle = 'rgba(220,240,240,0.12)'; ctx.lineWidth = 0.6;
+            ctx.beginPath(); ctx.moveTo(0, ry); ctx.lineTo(W, ry); ctx.stroke();
+        }
+        Engine.drawTextCentered(ctx, vi ? 'BẮT CÁ RÔ' : 'CATCH A FISH', 20, '#ffffff', 10, 800);
+        Engine.drawTextCentered(ctx, (vi ? 'Bắt được: ' : 'Caught: ') + this.fishCaught + ' / ' + this.fishTarget, 33, '#eafaff', 7, 600);
+
+        // timing bar
+        const barX = (W - 280) / 2, barY = H * 0.5, barW = 280, barH = 12;
+        ctx.fillStyle = 'rgba(10,20,24,0.8)'; Engine.roundRect(ctx, barX - 2, barY - 2, barW + 4, barH + 4, 4); ctx.fill();
+        // green strike zone
+        ctx.fillStyle = this.fishFlash > 0 ? '#bdf5b0' : 'rgba(90,210,120,0.85)';
+        Engine.roundRect(ctx, barX + this.fishZoneX, barY, this.fishZoneW, barH, 3); ctx.fill();
+        // bobber marker
+        const mx = barX + this.fishPos;
+        ctx.fillStyle = this.fishFlash < 0 ? '#ff7a6a' : '#ffe6a8';
+        Engine.roundRect(ctx, mx - 2, barY - 4, 4, barH + 8, 2); ctx.fill();
+        // little fish glyph on the marker
+        ctx.fillStyle = '#cfeaff'; ctx.beginPath(); ctx.ellipse(mx, barY + barH + 9, 4, 2.4, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(mx - 4, barY + barH + 9); ctx.lineTo(mx - 7, barY + barH + 6); ctx.lineTo(mx - 7, barY + barH + 12); ctx.closePath(); ctx.fill();
+
+        Engine.drawTextCentered(ctx, vi ? 'Nhấn SPACE khi cá vào vạch xanh' : 'Press SPACE when the fish is in the green', H - 12, '#eafaff', 7, 600);
+    },
+
+    renderHideGame(ctx) {
+        const W = Engine.W, H = Engine.H, vi = Engine.locale === 'vi';
+        const g = ctx.createLinearGradient(0, 0, 0, H);
+        g.addColorStop(0, '#e8c98a'); g.addColorStop(0.55, '#bfa06a'); g.addColorStop(1, '#6f7a44');
+        ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+        Engine.drawTextCentered(ctx, vi ? 'TRỐN TÌM' : 'HIDE & SEEK', 18, '#3a2a14', 10, 800);
+
+        const n = this.hideSpots.length, cw = W / n;
+        for (let i = 0; i < n; i++) {
+            const cx = i * cw + cw / 2, cy = H * 0.52;
+            const sel = i === this.hideCursor;
+            const isThu = this.hideFound && i === this.hideThuSpot;
+            // bush/spot
+            ctx.fillStyle = isThu ? '#7fae5a' : (sel ? '#5e8c3e' : '#4d7634');
+            ctx.beginPath(); ctx.ellipse(cx, cy, 26, 20, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.beginPath(); ctx.ellipse(cx, cy + 18, 22, 5, 0, 0, Math.PI * 2); ctx.fill();
+            // Thu peeking out when found
+            if (isThu) {
+                const prt = (typeof Assets !== 'undefined') ? Assets.getPortrait('thu_real_smile') : null;
+                if (prt) { ctx.save(); ctx.beginPath(); ctx.arc(cx, cy - 6, 13, 0, Math.PI * 2); ctx.clip(); ctx.imageSmoothingEnabled = true; ctx.drawImage(prt, cx - 14, cy - 20, 28, 28); ctx.imageSmoothingEnabled = false; ctx.restore(); }
+                else { ctx.fillStyle = '#ffe6c0'; ctx.beginPath(); ctx.arc(cx, cy - 6, 8, 0, Math.PI * 2); ctx.fill(); }
+            }
+            // selection arrow
+            if (sel && !this.hideFound) {
+                ctx.fillStyle = '#3a2a14'; ctx.beginPath(); ctx.moveTo(cx, cy - 30); ctx.lineTo(cx - 5, cy - 38); ctx.lineTo(cx + 5, cy - 38); ctx.closePath(); ctx.fill();
+            }
+            // label
+            ctx.fillStyle = '#3a2a14'; ctx.font = Engine.font(6.5, sel ? 800 : 600); ctx.textAlign = 'center';
+            ctx.fillText(vi ? this.hideSpots[i].vi : this.hideSpots[i].en, cx, cy + 34);
+            ctx.textAlign = 'left';
+        }
+
+        if (this.hideMsgT > 0 && this.hideMsg) {
+            Engine.drawTextCentered(ctx, this.hideMsg, H * 0.74, '#3a2a14', 7, 700);
+        }
+        if (this.hideFound) {
+            Engine.drawTextCentered(ctx, vi ? 'Tìm thấy rồi!' : 'Found her!', H * 0.74, '#235a23', 9, 800);
+        } else {
+            Engine.drawTextCentered(ctx, vi ? '← → chọn chỗ nấp · SPACE để tìm' : '← → pick a spot · SPACE to seek', H - 12, '#3a2a14', 7, 600);
+        }
+    },
+
     render(ctx) {
+        if (this.phase === 'minigame_fish') { this.renderFishGame(ctx); Dialogue.render(ctx); return; }
+        if (this.phase === 'minigame_hide') { this.renderHideGame(ctx); Dialogue.render(ctx); return; }
         if (this.phase === 'title_card') {
             // Chapter title card
             const g = ctx.createLinearGradient(0, 0, 0, Engine.H);
