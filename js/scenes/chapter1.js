@@ -14,11 +14,9 @@ const Chapter1Scene = {
     thuNPC: null,
     baNoi: null,
 
-    // --- Painted village world (uses the hand-painted map as the real ground) ---
-    painted: true,
-    S: 0.70,                 // scale from the 1024x698 painted crop to world pixels
-    WORLD_W: 0, WORLD_H: 0,
-    blockers: [],            // solid rects in world px
+    // World is a hand-laid tilemap (matches the painted reference map layout)
+    mapW: 50,
+    mapH: 42,
 
     init() {
         this.phase = 'title_card';
@@ -28,120 +26,130 @@ const Chapter1Scene = {
         this.pondVisits = 0;
         this.metThu = false;
         this.createMap();
-        this.setupPaintedWorld();
         this.createNPCs();
-        // Start near the village gate / bus stop (entry point on the painted map)
-        const s = this.S;
-        Player.reset(Math.round(235 * s), Math.round(300 * s));
+        // Arrive at the village gate / bus stop (top-left entry, like the map)
+        Player.reset(8 * 16 + 8, 5 * 16);
     },
 
-    // Build world dimensions + solid blockers from the painted map landmarks.
-    // All source numbers are in the 1024x698 painted-crop space, scaled by S.
-    setupPaintedWorld() {
-        const s = this.S;
-        this.WORLD_W = Math.round(1024 * s);
-        this.WORLD_H = Math.round(698 * s);
-        const R = (x, y, w, h) => ({ x: x * s, y: y * s, w: w * s, h: h * s });
-        this.blockers = [
-            R(285, 30, 165, 100),   // 3 · nhà bà nội
-            R(455, 175, 165, 120),  // 5 · đình làng
-            R(55, 355, 170, 115),   // 8 · nhà ông tư
-            R(745, 180, 115, 110),  // 6 · gốc cây đa
-            R(905, 0, 120, 560),    // 10 · ruộng / hàng rào cánh đồng
-            R(40, 585, 430, 113),   // 11 · ao/sông (mặt nước trái)
-            R(300, 620, 360, 78),   // 12 · khúc sông phải
-        ];
-    },
-
-    collidePainted(x, y, w = 9, h = 5) {
-        if (x - w / 2 < 0 || x + w / 2 > this.WORLD_W || y - h / 2 < 0 || y + h / 2 > this.WORLD_H) return true;
-        const pts = [[x - w/2, y - h/2], [x + w/2, y - h/2], [x - w/2, y + h/2], [x + w/2, y + h/2]];
-        for (const b of this.blockers) {
-            for (const [px, py] of pts) {
-                if (px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h) return true;
-            }
-        }
-        return false;
-    },
-
+    // Build a 50x42 tile village laid out to match the painted "Bản Đồ Làng".
+    // Landmark numbers refer to the map legend (1 bến xe … 13 nghĩa địa).
     createMap() {
-        const T = TileMap.TILES;
-        // Village map - 30x20 tiles
-        this.map = [];
-        for (let r = 0; r < 20; r++) {
-            this.map[r] = [];
-            for (let c = 0; c < 30; c++) {
-                // Default grass
-                let tile = T.GRASS;
+        const T = TileMap.TILES, W = this.mapW, H = this.mapH;
+        const m = [];
+        for (let r = 0; r < H; r++) { m[r] = []; for (let c = 0; c < W; c++) m[r][c] = T.GRASS; }
+        const inb = (r, c) => r >= 0 && r < H && c >= 0 && c < W;
+        const set = (r, c, t) => { if (inb(r, c)) m[r][c] = t; };
+        const rect = (r0, c0, r1, c1, t) => { for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) set(r, c, t); };
+        // thick dirt roads
+        const road = (r0, c0, r1, c1, w = 2) => {
+            if (r0 === r1) { for (let c = Math.min(c0, c1); c <= Math.max(c0, c1); c++) for (let k = 0; k < w; k++) set(r0 + k, c, T.DIRT); }
+            else { for (let r = Math.min(r0, r1); r <= Math.max(r0, r1); r++) for (let k = 0; k < w; k++) set(r, c0 + k, T.DIRT); }
+        };
 
-                // Dirt path (horizontal, middle area)
-                if (r >= 9 && r <= 10 && c >= 2 && c <= 27) tile = T.DIRT;
-                // Dirt path (vertical, to pond)
-                if (c >= 14 && c <= 15 && r >= 10 && r <= 17) tile = T.DIRT;
-                // Dirt path (to banyan tree)
-                if (c >= 4 && c <= 5 && r >= 5 && r <= 9) tile = T.DIRT;
+        // ---- 1) ROAD NETWORK (carved first; landmarks stamp over it) ----
+        road(12, 4, 12, 46, 2);      // main east-west village road
+        road(20, 6, 20, 36, 2);      // lower east-west road
+        road(4, 7, 12, 7, 2);        // bus stop / gate -> main road
+        road(6, 20, 12, 20, 2);      // grandma house -> road
+        road(12, 31, 16, 31, 2);     // road -> temple/courtyard
+        road(12, 24, 22, 24, 2);     // road -> well -> south
+        road(20, 9, 12, 9, 2);       // ông tư house spur
+        road(12, 39, 9, 39, 2);      // road -> banyan
+        road(22, 24, 30, 16, 2);     // well -> down toward river bank
+        road(20, 31, 24, 31, 2);     // road -> kite field
+        road(12, 41, 20, 41, 2);     // road -> rice fields
 
-                // Water (pond, bottom right area)
-                if (r >= 15 && r <= 18 && c >= 12 && c <= 20) tile = T.WATER;
-                if (r >= 16 && r <= 17 && c >= 11 && c <= 21) tile = T.WATER;
-                // Lotus
-                if (r === 15 && c === 14) tile = T.LOTUS;
-                if (r === 17 && c === 18) tile = T.LOTUS;
+        // ---- 11/12) RIVER (organic lake across the bottom) ----
+        rect(34, 8, 40, 28, T.WATER);
+        rect(36, 6, 41, 31, T.WATER);
+        rect(33, 12, 35, 24, T.WATER);
+        // soften top corners back to grass
+        set(34, 8, T.GRASS); set(34, 9, T.GRASS); set(34, 27, T.GRASS); set(34, 28, T.GRASS);
+        set(33, 12, T.GRASS); set(33, 24, T.GRASS);
+        // bridge crossing + bathing dock
+        rect(31, 15, 41, 16, T.BRIDGE);   // foot bridge over the river
+        rect(34, 24, 35, 26, T.BRIDGE);   // bãi tắm sông dock (12)
+        // lotus pads
+        set(35, 11, T.LOTUS); set(38, 22, T.LOTUS); set(37, 13, T.LOTUS); set(39, 27, T.LOTUS);
 
-                // Houses
-                if (r >= 5 && r <= 7 && c >= 8 && c <= 10) tile = T.HOUSE;
-                if (r >= 5 && r <= 7 && c >= 18 && c <= 20) tile = T.HOUSE;
-                if (r >= 11 && r <= 13 && c >= 22 && c <= 24) tile = T.HOUSE;
+        // ---- 1) BẾN XE LÀNG (bus stop) ----
+        rect(2, 4, 3, 7, T.BUS);
+        set(3, 10, T.SHELTER); set(3, 11, T.SHELTER);
 
-                // Banyan tree area (top left)
-                if (r >= 3 && r <= 5 && c >= 3 && c <= 5) tile = T.BANYAN;
+        // ---- 2) CỔNG LÀNG (stone gate with a passage) ----
+        rect(9, 5, 11, 9, T.STONE);
+        rect(9, 7, 11, 8, T.DIRT);   // walk-through arch passage
 
-                // Shrine next to banyan
-                if (r === 6 && c === 3) tile = T.SHRINE;
+        // ---- 3) NHÀ BÀ NỘI ----
+        rect(3, 18, 6, 22, T.HOUSE);
+        rect(7, 18, 7, 22, T.FENCE); set(7, 20, T.DIRT);
 
-                // Temple/Đình gate (top right area) — walled stone structure
-                if (r >= 2 && r <= 4 && c >= 23 && c <= 27) tile = T.STONE;
+        // ---- 4) SÂN ĐÌNH (paved courtyard) + flag ----
+        rect(14, 18, 17, 24, T.PAVED);
+        set(14, 21, T.FLAG);
+        set(13, 17, T.FENCE); set(14, 17, T.FENCE); set(15, 17, T.FENCE); set(16, 17, T.FENCE); set(17, 17, T.FENCE);
 
-                // Bamboo border
-                if (r === 0 || r === 19) tile = T.BAMBOO;
-                if (c === 0 || c === 29) tile = T.BAMBOO;
+        // ---- 5) ĐÌNH LÀNG (communal temple) ----
+        rect(8, 29, 11, 35, T.HOUSE);
+        set(12, 29, T.LANTERN); set(12, 35, T.LANTERN);
+        set(12, 32, T.SHRINE);
 
-                // Trees scattered
-                if (r === 7 && c === 13) tile = T.TREE;
-                if (r === 3 && c === 12) tile = T.TREE;
-                if (r === 12 && c === 8) tile = T.TREE;
-                if (r === 8 && c === 25) tile = T.TREE;
-                if (r === 14 && c === 3) tile = T.TREE;
-                if (r === 2 && c === 15) tile = T.TREE;
+        // ---- 6) CÂY ĐA (banyan) + scattered old graves ----
+        rect(5, 38, 7, 40, T.BANYAN);
+        set(8, 37, T.GRAVE); set(8, 41, T.GRAVE); set(9, 38, T.GRAVE); set(9, 40, T.GRAVE);
 
-                // Fence near houses
-                if (r === 8 && c >= 8 && c <= 10) tile = T.FENCE;
-                if (r === 8 && c >= 18 && c <= 20) tile = T.FENCE;
+        // ---- 7) GIẾNG NƯỚC (well) ----
+        rect(21, 24, 22, 25, T.WELL);
 
-                this.map[r][c] = tile;
-            }
-        }
+        // ---- 8) NHÀ ÔNG TƯ ----
+        rect(17, 7, 20, 11, T.HOUSE);
+        rect(21, 7, 21, 11, T.FENCE); set(21, 9, T.DIRT);
+
+        // ---- 9) BÃI THẢ DIỀU (open kite field — leave grass + flowers) ----
+        set(24, 30, T.FLAG); // small marker; mostly open ground
+
+        // ---- 10) CÁNH ĐỒNG (rice paddies, fenced with bunds) ----
+        rect(18, 41, 30, 48, T.RICE);
+        // bund gaps (walk lines) every few rows -> grass dividers
+        for (let c = 41; c <= 48; c++) { set(22, c, T.GRASS); set(26, c, T.GRASS); }
+        rect(17, 41, 17, 48, T.FENCE);
+
+        // ---- 13) NGHĨA ĐỊA CŨ (walled old cemetery) ----
+        rect(33, 38, 33, 47, T.WALL);     // top wall
+        rect(33, 38, 40, 38, T.WALL);     // left wall
+        rect(33, 47, 40, 47, T.WALL);     // right wall
+        for (let r = 35; r <= 39; r += 2) for (let c = 40; c <= 45; c += 2) set(r, c, T.GRAVE);
+
+        // ---- scattered trees & bushes for life ----
+        const trees = [[3, 13], [5, 25], [7, 14], [9, 27], [14, 13], [16, 34], [18, 16], [22, 13], [24, 27], [10, 44], [6, 33], [16, 27], [27, 9]];
+        trees.forEach(([r, c]) => { if (m[r][c] === T.GRASS) set(r, c, T.TREE); });
+
+        // ---- bamboo hedge framing the village edges ----
+        for (let c = 0; c < W; c++) { if (m[0][c] === T.GRASS) set(0, c, T.BAMBOO); if (m[H - 1][c] === T.GRASS) set(H - 1, c, T.BAMBOO); }
+        for (let r = 0; r < H; r++) { if (m[r][0] === T.GRASS) set(r, 0, T.BAMBOO); if (m[r][W - 1] === T.GRASS) set(r, W - 1, T.BAMBOO); }
+
+        this.map = m;
     },
 
     createNPCs() {
-        const s = this.S;
+        const TS = 16;
         this.npcs = [];
-        // Bà Nội in front of her house (landmark 3)
-        this.baNoi = new NPC('Bà Nội', 'ba_noi', Math.round(360 * s), Math.round(150 * s), 'down');
+        // Bà Nội just in front of her house (landmark 3)
+        this.baNoi = new NPC('Bà Nội', 'ba_noi', 20 * TS + 8, 8 * TS, 'down');
         this.npcs.push(this.baNoi);
 
         // Thu (hidden at first, appears on the river bank — landmark 12)
-        this.thuNPC = new NPC('Thu', 'thu', Math.round(470 * s), Math.round(575 * s), 'down', true);
+        this.thuNPC = new NPC('Thu', 'thu', 25 * TS + 8, 32 * TS + 8, 'down', true);
         this.thuNPC.visible = false;
         this.npcs.push(this.thuNPC);
 
-        // Hotspots — placed on walkable ground next to the painted landmarks so the
-        // player can stand inside them and press Space to interact.
-        const H = (x, y, w, h, id, label) => new Hotspot(x * s, y * s, w * s, h * s, id, label);
+        // Hotspots — placed on walkable ground beside each landmark so the player
+        // can stand inside them and press Space to interact.
+        const H = (c, r, wc, hr, id, label) => new Hotspot(c * TS, r * TS, wc * TS, hr * TS, id, label);
         this.hotspots = [
-            H(700, 285, 80, 70, 'tree', 'Cây đa'),     // 6 · path below the banyan
-            H(225, 540, 160, 35, 'pond', 'Bờ sông'),   // 11 · river bank
-            H(470, 315, 100, 35, 'temple', 'Sân đình'),// 5 · in front of đình steps
+            H(37, 8, 4, 2, 'tree', 'Cây đa'),     // 6 · just below the banyan
+            H(18, 31, 8, 2, 'pond', 'Bờ sông'),   // 11 · river bank
+            H(18, 18, 6, 2, 'temple', 'Sân đình'),// 4/5 · edge of the courtyard
         ];
     },
 
@@ -211,8 +219,8 @@ const Chapter1Scene = {
         this.npcs.forEach(n => n.update(dt));
 
         // Camera follow player
-        const worldW = this.painted ? this.WORLD_W : 30 * 16;
-        const worldH = this.painted ? this.WORLD_H : 20 * 16;
+        const worldW = this.mapW * 16;
+        const worldH = this.mapH * 16;
         this.cameraX = Player.x - Engine.W / 2;
         this.cameraY = Player.y - Engine.H / 2;
         this.cameraX = Math.max(0, Math.min(this.cameraX, worldW - Engine.W));
@@ -229,19 +237,17 @@ const Chapter1Scene = {
         const TS = 16;
         if (!this.visitedHotspots.tree) {
             Engine.setObjective('Tới thăm cây đa đầu làng', 'Visit the old banyan tree',
-                { x: 4 * TS + 8, y: 5 * TS + 8 });
+                { x: 39 * TS, y: 8 * TS });
         } else if (!this.metThu) {
-            Engine.setObjective('Ra bờ ao chơi', 'Wander down to the pond',
-                { x: 16 * TS, y: 15 * TS });
+            Engine.setObjective('Ra bờ sông chơi', 'Wander down to the river',
+                { x: 22 * TS, y: 32 * TS });
         } else {
             Engine.clearObjective();
         }
     },
 
     updateExplore(dt) {
-        Player.update(dt, (x, y) => this.painted
-            ? this.collidePainted(x, y)
-            : TileMap.checkCollision(this.map, x, y));
+        Player.update(dt, (x, y) => TileMap.checkCollision(this.map, x, y));
         Dialogue.update(dt);
         this.updateObjective();
         if (Dialogue.active) return;
@@ -271,9 +277,9 @@ const Chapter1Scene = {
             }
         }
 
-        // Track pond visits (river bank area near landmark 11/12)
-        const s = this.S;
-        if (Player.x > 200 * s && Player.x < 540 * s && Player.y > 525 * s && Player.y < 580 * s) {
+        // Track river-bank visits (near landmark 11/12)
+        const TS = 16;
+        if (Player.x > 16 * TS && Player.x < 27 * TS && Player.y > 30 * TS && Player.y < 33 * TS) {
             if (!this._atPond) {
                 this._atPond = true;
                 this.pondVisits++;
@@ -345,8 +351,8 @@ const Chapter1Scene = {
         this.phase = 'unease';
         // Move player to home area
         this.baNoi.visible = true;
-        this.baNoi.x = Math.round(360 * this.S);
-        this.baNoi.y = Math.round(150 * this.S);
+        this.baNoi.x = 20 * 16 + 8;
+        this.baNoi.y = 8 * 16;
 
         Dialogue.startRaw(Engine.getDialogue('ch1_unease'), () => {
             // Transition to Chapter 2
@@ -370,19 +376,8 @@ const Chapter1Scene = {
             return;
         }
 
-        // Render world
-        const ground = this.painted && typeof Assets !== 'undefined' ? Assets.get('village_ground') : null;
-        if (ground) {
-            ctx.fillStyle = '#2c3a22';
-            ctx.fillRect(0, 0, Engine.W, Engine.H);
-            const prev = ctx.imageSmoothingEnabled;
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'high';
-            ctx.drawImage(ground, -this.cameraX, -this.cameraY, this.WORLD_W, this.WORLD_H);
-            ctx.imageSmoothingEnabled = prev;
-        } else {
-            TileMap.renderMap(ctx, this.map, this.cameraX, this.cameraY, 1);
-        }
+        // Render world (hand-laid tilemap)
+        TileMap.renderMap(ctx, this.map, this.cameraX, this.cameraY, 1);
 
         // Render hotspots
         this.hotspots.forEach(hs => hs.render(ctx, this.cameraX, this.cameraY));

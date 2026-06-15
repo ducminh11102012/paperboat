@@ -7,10 +7,12 @@ const TileMap = {
         BAMBOO: 6, BANYAN: 7, SHRINE: 8, LANTERN: 9, STONE: 10,
         BRIDGE: 11, FENCE: 12, LOTUS: 13, GRAVE: 14, DOOR: 15,
         FLOOR: 16, SHELF: 17,
+        RICE: 18, PAVED: 19, WELL: 20, FLAG: 21, BUS: 22, SHELTER: 23,
     },
 
     isBlocking(tile) {
-        return [2, 3, 4, 5, 6, 7, 8, 12, 14, 17].includes(tile);
+        // RICE(18) WELL(20) FLAG(21) BUS(22) SHELTER(23) are solid
+        return [2, 3, 4, 5, 6, 7, 8, 12, 14, 17, 18, 20, 21, 22, 23].includes(tile);
     },
 
     is(map, r, c, type) {
@@ -69,9 +71,54 @@ const TileMap = {
         if (tile === T.FLOOR || tile === T.SHELF || tile === T.WALL || tile === T.DOOR) {
             this.drawWoodFloor(ctx, x, y); return;
         }
+        if (tile === T.RICE) { this.drawRice(ctx, map, r, c, x, y); return; }
+        if (tile === T.PAVED) { this.drawPaved(ctx, map, r, c, x, y); return; }
         if (tile === T.DIRT || tile === T.BRIDGE) { this.drawPath(ctx, map, r, c, x, y); return; }
+        // banyan / well / flag / bus / shelter sit on a grass base
         // default: grass base (also under trees/houses/fences/etc)
         this.drawGrass(ctx, c, r, x, y);
+    },
+
+    // Rice paddy ground — wet green field with crop rows and earthen bunds
+    drawRice(ctx, map, r, c, x, y) {
+        const TS = this.TILE_SIZE, T = this.TILES;
+        const isR = (rr, cc) => this.is(map, rr, cc, T.RICE);
+        // water-logged base
+        ctx.fillStyle = '#6f9a3e';
+        ctx.fillRect(x, y, TS, TS);
+        ctx.fillStyle = 'rgba(120,160,80,0.45)';
+        ctx.fillRect(x, y, TS, TS);
+        // crop rows
+        ctx.fillStyle = '#4e7a2c';
+        for (let i = 1; i < 4; i++) {
+            const yy = y + i * 4;
+            for (let xx = x + 1; xx < x + TS; xx += 3) ctx.fillRect(xx, yy, 1, 2);
+        }
+        // glint
+        ctx.fillStyle = 'rgba(220,240,180,0.25)';
+        ctx.fillRect(x + 2, y + 2, 2, 1);
+        // earthen bund (dike) on edges next to non-rice
+        ctx.fillStyle = '#a98b5a';
+        if (!isR(r - 1, c)) ctx.fillRect(x, y, TS, 2);
+        if (!isR(r + 1, c)) ctx.fillRect(x, y + TS - 2, TS, 2);
+        if (!isR(r, c - 1)) ctx.fillRect(x, y, 2, TS);
+        if (!isR(r, c + 1)) ctx.fillRect(x + TS - 2, y, 2, TS);
+    },
+
+    // Paved courtyard ground — warm terracotta brick
+    drawPaved(ctx, map, r, c, x, y) {
+        const TS = this.TILE_SIZE, T = this.TILES;
+        ctx.fillStyle = '#9c6b47';
+        ctx.fillRect(x, y, TS, TS);
+        ctx.fillStyle = 'rgba(60,35,20,0.35)';
+        // brick seams (offset rows)
+        const off = (r % 2) * 8;
+        ctx.fillRect(x, y, TS, 1);
+        ctx.fillRect(x, y + 8, TS, 1);
+        ctx.fillRect(x + ((off) % TS), y, 1, 8);
+        ctx.fillRect(x + ((off + 8) % TS), y + 8, 1, 8);
+        ctx.fillStyle = 'rgba(255,225,180,0.10)';
+        ctx.fillRect(x, y + 1, TS, 1);
     },
 
     drawGrass(ctx, c, r, x, y) {
@@ -191,6 +238,66 @@ const TileMap = {
             case T.WALL: Tileset.draw(ctx, N.WALL, x, y, TS); break;
             case T.DOOR: Tileset.draw(ctx, N.WALL_DOOR, x, y, TS); break;
             case T.SHELF: Tileset.draw(ctx, N.BARREL, x, y, TS); break;
+            case T.WELL: {
+                // stone well — only on the block's top-left so the 2x2 draws once
+                const W2 = (rr, cc) => this.is(map, rr, cc, T.WELL);
+                if (!W2(r - 1, c) && !W2(r, c - 1)) {
+                    ctx.fillStyle = 'rgba(0,0,0,0.22)';
+                    ctx.beginPath(); ctx.ellipse(x + 16, y + 24, 14, 4, 0, 0, 7); ctx.fill();
+                    Tileset.draw(ctx, N.WELL, x, y + 4, TS);           // base
+                    Tileset.draw(ctx, N.WELL, x + TS, y + 4, TS);
+                    // little roof posts + beam
+                    ctx.fillStyle = '#6b4a2c'; ctx.fillRect(x + 2, y - 2, 2, 10); ctx.fillRect(x + 28, y - 2, 2, 10);
+                    ctx.fillStyle = '#8a3324'; ctx.fillRect(x, y - 5, TS * 2, 4);
+                    ctx.fillStyle = '#5a2018'; ctx.fillRect(x, y - 1, TS * 2, 1);
+                }
+                break;
+            }
+            case T.FLAG: {
+                // tall pole with a red ceremonial banner (sân đình)
+                ctx.fillStyle = 'rgba(0,0,0,0.18)';
+                ctx.beginPath(); ctx.ellipse(x + 8, y + 15, 4, 1.6, 0, 0, 7); ctx.fill();
+                ctx.fillStyle = '#caa15a'; ctx.fillRect(x + 7, y - 8, 2, 23);
+                const sw = Math.sin(Engine.frameCount * 0.06) * 1.5;
+                ctx.fillStyle = '#b0301f';
+                ctx.beginPath();
+                ctx.moveTo(x + 9, y - 7);
+                ctx.lineTo(x + 18 + sw, y - 4);
+                ctx.lineTo(x + 9, y + 1);
+                ctx.closePath(); ctx.fill();
+                ctx.fillStyle = '#ffd76a'; ctx.fillRect(x + 11, y - 5, 3, 3);
+                break;
+            }
+            case T.BUS: {
+                // old village bus — draw once at the block's top-left (4 wide x 2 tall)
+                const B = (rr, cc) => this.is(map, rr, cc, T.BUS);
+                if (!B(r - 1, c) && !B(r, c - 1)) {
+                    const bw = 56, bh = 26, bx = x + 2, by = y + 2;
+                    ctx.fillStyle = 'rgba(0,0,0,0.22)';
+                    ctx.fillRect(bx + 2, by + bh - 2, bw - 4, 4);
+                    ctx.fillStyle = '#d9c187'; ctx.fillRect(bx, by, bw, bh - 6);          // cream body
+                    ctx.fillStyle = '#c0392b'; ctx.fillRect(bx, by + bh - 12, bw, 5);    // red stripe
+                    ctx.fillStyle = '#3a3a44'; ctx.fillRect(bx, by + bh - 7, bw, 5);     // skirt
+                    ctx.fillStyle = '#7fb0c8';                                            // windows
+                    for (let i = 0; i < 5; i++) ctx.fillRect(bx + 4 + i * 11, by + 4, 8, 8);
+                    ctx.fillStyle = '#2a2a30';                                            // wheels
+                    ctx.beginPath(); ctx.arc(bx + 12, by + bh, 4, 0, 7); ctx.arc(bx + bw - 12, by + bh, 4, 0, 7); ctx.fill();
+                    ctx.fillStyle = '#ffe08a'; ctx.fillRect(bx + bw - 2, by + bh - 14, 2, 3); // headlight
+                }
+                break;
+            }
+            case T.SHELTER: {
+                // simple wooden roof shelter (bến xe / bus stop & well shade)
+                const S2 = (rr, cc) => this.is(map, rr, cc, T.SHELTER);
+                if (!S2(r - 1, c) && !S2(r, c - 1)) {
+                    const left = !S2(r, c - 1), right = !S2(r, c + 1);
+                    ctx.fillStyle = '#6b4a2c';
+                    ctx.fillRect(x + 1, y + 6, 2, 10);
+                    ctx.fillStyle = '#8a5a30'; ctx.fillRect(x, y, TS, 5);
+                    ctx.fillStyle = '#5a3a1e'; ctx.fillRect(x, y + 4, TS, 1);
+                }
+                break;
+            }
         }
     },
 
