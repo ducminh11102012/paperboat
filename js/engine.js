@@ -90,9 +90,11 @@ const Engine = {
         this.lastTime = now;
         this.frameCount++;
 
-        // Village map overlay intercepts input + freezes the world while open
+        // Village map + notebook overlays intercept input + freeze the world while open
         if (typeof MapScreen !== 'undefined') MapScreen.handleInput();
-        const mapOpen = (typeof MapScreen !== 'undefined') && MapScreen.active;
+        if (typeof Notebook !== 'undefined') Notebook.handleInput();
+        const mapOpen = ((typeof MapScreen !== 'undefined') && MapScreen.active)
+                     || ((typeof Notebook !== 'undefined') && Notebook.active);
 
         if (!mapOpen && this.currentScene && this.currentScene.update) {
             this.currentScene.update(this.dt);
@@ -112,10 +114,12 @@ const Engine = {
         if (typeof Hud !== 'undefined' && this.currentScene && this.currentScene.showHud !== false && !mapOpen) {
             Hud.render(ctx);
             if (typeof MapScreen !== 'undefined') MapScreen.renderButtonHint(ctx);
+            if (typeof Notebook !== 'undefined') Notebook.renderButtonHint(ctx);
         }
 
-        // Village map overlay (above everything except transitions)
+        // Village map + notebook overlays (above everything except transitions)
         if (typeof MapScreen !== 'undefined') MapScreen.render(ctx);
+        if (typeof Notebook !== 'undefined') Notebook.render(ctx);
 
         // Transition overlay
         if (this.transitioning) {
