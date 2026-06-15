@@ -198,12 +198,39 @@ const TileMap = {
                 const center = this.is(map, r - 1, c, T.BANYAN) && this.is(map, r + 1, c, T.BANYAN)
                     && this.is(map, r, c - 1, T.BANYAN) && this.is(map, r, c + 1, T.BANYAN);
                 if (center) {
-                    ctx.fillStyle = 'rgba(0,0,0,0.24)';
-                    ctx.beginPath(); ctx.ellipse(x + 8, y + 18, 18, 5, 0, 0, 7); ctx.fill();
-                    Tileset.draw(ctx, 16, x - 16, y - 18, 48); // large canopy
-                    // red prayer cloth on the trunk (banyan shrine)
-                    ctx.fillStyle = '#c0392b'; ctx.fillRect(x + 6, y + 10, 3, 6);
-                    ctx.fillStyle = '#ffd76a'; ctx.fillRect(x + 6, y + 10, 3, 1);
+                    const cx = x + 8, cy = y + 8;
+                    // ground shadow
+                    ctx.fillStyle = 'rgba(0,0,0,0.26)';
+                    ctx.beginPath(); ctx.ellipse(cx, cy + 16, 26, 7, 0, 0, 7); ctx.fill();
+                    // gnarled trunk with hanging aerial roots (đặc trưng cây đa)
+                    ctx.fillStyle = '#5a4632';
+                    ctx.fillRect(cx - 6, cy - 2, 12, 22);
+                    ctx.fillStyle = '#6b5640';
+                    ctx.fillRect(cx - 10, cy + 2, 3, 18);
+                    ctx.fillRect(cx + 8, cy + 4, 3, 16);
+                    ctx.fillRect(cx - 2, cy + 6, 2, 14);
+                    ctx.fillStyle = '#46362a';
+                    ctx.fillRect(cx - 6, cy - 2, 3, 22);
+                    // big layered canopy
+                    const blobs = [
+                        [0, -20, 24, 16, '#33602f'], [-16, -14, 18, 13, '#2c5429'],
+                        [16, -14, 18, 13, '#2c5429'], [0, -28, 18, 12, '#3a6c34'],
+                        [-10, -22, 14, 11, '#3f7338'], [10, -22, 14, 11, '#3f7338'],
+                    ];
+                    for (const [dx, dy, rx, ry, col] of blobs) {
+                        ctx.fillStyle = col;
+                        ctx.beginPath(); ctx.ellipse(cx + dx, cy + dy, rx, ry, 0, 0, 7); ctx.fill();
+                    }
+                    // leaf speckle highlights
+                    ctx.fillStyle = 'rgba(150,200,110,0.45)';
+                    for (let i = 0; i < 14; i++) {
+                        const a = i * 1.3, rr = 10 + (i % 3) * 6;
+                        ctx.fillRect(cx + Math.cos(a) * rr, cy - 20 + Math.sin(a) * rr * 0.7, 2, 2);
+                    }
+                    // red prayer cloth + offering on the trunk
+                    ctx.fillStyle = '#b0301f'; ctx.fillRect(cx - 3, cy + 4, 6, 8);
+                    ctx.fillStyle = '#ffd76a'; ctx.fillRect(cx - 3, cy + 4, 6, 2);
+                    ctx.fillStyle = '#e0c070'; ctx.fillRect(cx - 2, cy + 13, 4, 2);
                 }
                 break;
             }
@@ -304,31 +331,36 @@ const TileMap = {
     drawHouse(ctx, map, r, c, x, y) {
         const N = Tileset.NAMED, T = this.TILES, TS = this.TILE_SIZE;
         const H = (rr, cc) => this.is(map, rr, cc, T.HOUSE);
-        // pick color variant per building (hash of block's top-left-ish)
-        // find block top row
-        const isRoofRow = !H(r - 1, c);
-        const left = !H(r, c - 1), right = !H(r, c + 1);
-        const red = (this.rnd(Math.floor(c / 3), Math.floor(r / 3), 9) > 0.5);
-        if (isRoofRow) {
-            // roof
-            let idx;
-            if (left && right) idx = red ? N.ROOF_RED_M : N.ROOF_GREY_M;
-            else if (left) idx = red ? N.ROOF_RED_L : N.ROOF_GREY_L;
-            else if (right) idx = red ? N.ROOF_RED_R : N.ROOF_GREY_R;
-            else idx = red ? N.ROOF_RED_M : N.ROOF_GREY_M;
-            // shadow under roof eave below
+        // horizontal span of this building row
+        let cl = c; while (H(r, cl - 1)) cl--;
+        let cr = c; while (H(r, cr + 1)) cr++;
+        const left = (c === cl), right = (c === cr);
+        const width = cr - cl + 1, mid = cl + Math.floor(width / 2);
+        // stable colour variant per building
+        const red = this.rnd(cl, cr, 9) > 0.45;
+
+        const isRoof = !H(r - 1, c);                 // very top row
+        const isEave = H(r - 1, c) && !H(r - 2, c);  // second row
+        if (isRoof) {
+            const idx = left ? (red ? N.ROOF_RED_L : N.ROOF_GREY_L)
+                : right ? (red ? N.ROOF_RED_R : N.ROOF_GREY_R)
+                    : (red ? N.ROOF_RED_M : N.ROOF_GREY_M);
             Tileset.draw(ctx, idx, x, y, TS);
-        } else {
-            // wall row
-            const bottom = !H(r + 1, c);
-            // center column of block?
-            const centerCol = H(r, c - 1) && H(r, c + 1);
-            let idx = N.WALL;
-            if (bottom && centerCol) idx = N.WALL_DOOR;
-            else if (!bottom && centerCol) idx = N.WALL_WINDOW;
-            else if (this.rnd(c, r, 7) > 0.6) idx = N.WALL_WINDOW2;
-            Tileset.draw(ctx, idx, x, y, TS);
+            return;
         }
+        if (isEave) {
+            const idx = left ? (red ? N.EAVE_RED_L : N.EAVE_GREY_L)
+                : right ? (red ? N.EAVE_RED_R : N.EAVE_GREY_R)
+                    : (red ? N.EAVE_RED_M : N.EAVE_GREY_M);
+            Tileset.draw(ctx, idx, x, y, TS);
+            return;
+        }
+        // wall rows: single central door at the bottom, sparse windows above
+        const bottom = !H(r + 1, c);
+        let idx = N.WALL;
+        if (bottom && c === mid) idx = N.WALL_DOOR;
+        else if (!bottom && !left && !right && ((c - cl) % 2 === 0)) idx = N.WALL_WINDOW;
+        Tileset.draw(ctx, idx, x, y, TS);
     },
 
     drawStone(ctx, map, r, c, x, y) {
