@@ -122,14 +122,37 @@ const TileMap = {
     },
 
     drawGrass(ctx, c, r, x, y) {
-        const N = Tileset.NAMED;
+        const N = Tileset.NAMED, TS = this.TILE_SIZE;
         const v = this.rnd(c, r, 1);
         let idx = N.GRASS;
-        if (v > 0.965) idx = N.GRASS_FLOWER;     // rare flower clumps
-        else if (v > 0.78) idx = N.GRASS2;        // subtle variation
-        Tileset.draw(ctx, idx, x, y, this.TILE_SIZE);
+        if (v > 0.95) idx = N.GRASS_FLOWER;       // flower clumps (a touch more)
+        else if (v > 0.72) idx = N.GRASS2;        // subtle variation
+        Tileset.draw(ctx, idx, x, y, TS);
+
         // very rare mushroom decoration
-        if (v > 0.992) Tileset.draw(ctx, N.MUSHROOM, x, y, this.TILE_SIZE);
+        if (v > 0.992) Tileset.draw(ctx, N.MUSHROOM, x, y, TS);
+
+        // --- "đắp" decoration pass: scatter small bushes + ground detail ---
+        const w = this.rnd(c, r, 7);
+        if (w > 0.978) {
+            Tileset.draw(ctx, N.BUSH, x, y - 1, TS);   // small bush tuft
+        } else if (w > 0.40 && w < 0.62) {
+            // tiny grass-blade / pebble specks for texture (procedural, cheap)
+            const gx = x + Math.floor(this.rnd(c, r, 11) * 12) + 2;
+            const gy = y + Math.floor(this.rnd(c, r, 13) * 11) + 3;
+            if (w > 0.55) { ctx.fillStyle = 'rgba(120,150,80,0.45)'; ctx.fillRect(gx, gy, 1, 2); ctx.fillRect(gx + 1, gy + 1, 1, 1); }
+            else { ctx.fillStyle = 'rgba(150,140,120,0.40)'; ctx.fillRect(gx, gy, 2, 1); }
+        }
+        // occasional scattered flower dots (warm accent)
+        const f = this.rnd(c, r, 17);
+        if (f > 0.93 && idx !== N.GRASS_FLOWER) {
+            const fx = x + Math.floor(this.rnd(c, r, 19) * 12) + 2;
+            const fy = y + Math.floor(this.rnd(c, r, 23) * 10) + 3;
+            ctx.fillStyle = f > 0.97 ? 'rgba(235,210,90,0.85)' : 'rgba(220,140,170,0.8)';
+            ctx.fillRect(fx, fy, 1, 1);
+            ctx.fillStyle = 'rgba(90,130,70,0.6)';
+            ctx.fillRect(fx, fy + 1, 1, 1);
+        }
     },
 
     drawPath(ctx, map, r, c, x, y) {
