@@ -178,6 +178,7 @@ const Chapter1Scene = {
                 if (!this._arrivedDialogue) {
                     this._arrivedDialogue = true;
                     Dialogue.startRaw(Engine.getDialogue('ch1_arrive'), () => {
+                        if (typeof Notebook !== 'undefined') Notebook.meetPerson('ba_noi');
                         this.phase = 'explore';
                         this.baNoi.visible = false; // Bà goes inside
                         this.enterExplore();
@@ -327,6 +328,7 @@ const Chapter1Scene = {
         Player.lock();
         this.phase = 'meet_thu_intro';
 
+        if (typeof Notebook !== 'undefined') { Notebook.meetPerson('thu'); Notebook.addClue('thu_long_time'); }
         Dialogue.startRaw(Engine.getDialogue('ch1_meet_thu_intro'), () => {
             Dialogue.startRaw(Engine.getDialogue('ch1_meet_thu'), () => {
                 this.phase = 'choice1';
@@ -349,6 +351,7 @@ const Chapter1Scene = {
 
     startUnease() {
         this.phase = 'unease';
+        if (typeof Notebook !== 'undefined') { Notebook.addClue('thu_no_eat'); Notebook.addClue('ba_noi_pause'); }
         // Move player to home area
         this.baNoi.visible = true;
         this.baNoi.x = 20 * 16 + 8;
